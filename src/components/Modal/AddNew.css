@@ -1,0 +1,47 @@
+.ant-modal-body {
+  padding-top: 12px;
+
+}
+
+.modal-container {
+  label {
+    margin-top: 10px;
+  }
+}
+.button-group {
+  display: flex;
+  justify-content: space-around;
+}
+
+.option-button {
+  margin-top: 20px;
+}
+.custom-button {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.cron-scheduler {
+  width: 100%;
+  margin-top: 20px;
+  border-radius: 8px;
+}
+
+.fields {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.field {
+  width: 100%;
+}
+
+.set-button {
+  width: 100%;
+}
+
+.submit-button {
+  display: flex;
+  
+}

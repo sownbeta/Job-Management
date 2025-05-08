@@ -1,153 +1,92 @@
 import React, { useState } from 'react';
+import { Modal, Button, Input, TimePicker, Upload, message } from 'antd';
+import { UploadOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import './AddNew.css';
-import { Modal, Button, Input, message } from 'antd';
 
 const AddNewModal = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [cronExpression, setCronExpression] = useState({
-    minute: '',
-    hour: '',
-    day: '',
-    month: '',
-    week: '',
-  });
-  const [errors, setErrors] = useState({
-    minute: '',
-    hour: '',
-    day: '',
-    month: '',
-    week: '',
-  });
+  const [startTime, setStartTime] = useState(dayjs('00:00', 'HH:mm'));
+  const [endTime, setEndTime] = useState(dayjs('00:00', 'HH:mm'));
+  const [name, setName] = useState('');
 
   const buttons = ['Startup', 'Hourly', 'Daily', 'Weekly', 'Monthly', 'Yearly'];
 
-  const validateField = (field, value) => {
-    if (value && !/^\d*$/.test(value)) {
-      return 'Numbers only';
-    }
+  const showModal = () => setIsModalOpen(true);
+  const handleCancel = () => setIsModalOpen(false);
 
-    switch (field) {
-      case 'minute':
-        if (value && (parseInt(value) < 0 || parseInt(value) > 59)) {
-          return 'Minute must be from 0 to 59';
-        }
-        break;
-      case 'hour':
-        if (value && (parseInt(value) < 0 || parseInt(value) > 23)) {
-          return 'Hour must be from 0 to 23';
-        }
-        break;
-      case 'day':
-        if (value && (parseInt(value) < 1 || parseInt(value) > 31)) {
-          return 'Day must be from 1 to 31';
-        }
-        break;
-      case 'month':
-        if (value && (parseInt(value) < 1 || parseInt(value) > 12)) {
-          return 'Month must be from 1 to 12';
-        }
-        break;
-      case 'week':
-        if (value && (parseInt(value) < 0 || parseInt(value) > 6)) {
-          return 'Week must be from 0 to 6 (0: Sunday, 6: Saturday)';
-        }
-        break;
-      default:
-        break;
-    }
-    return '';
-  };
-
-  const handleChange = (field, value) => {
-    const error = validateField(field, value);
-    setErrors({
-      ...errors,
-      [field]: error,
-    });
-
-    // Chỉ cập nhật nếu giá trị hợp lệ hoặc rỗng
-    if (!error || value === '') {
-      setCronExpression({
-        ...cronExpression,
-        [field]: value,
-      });
-    }
-  };
-
-  const validateCron = () => {
-    const { minute, hour, day, month, week } = cronExpression;
-    const newErrors = {};
-
-    newErrors.minute = validateField('minute', minute);
-    newErrors.hour = validateField('hour', hour);
-    newErrors.day = validateField('day', day);
-    newErrors.month = validateField('month', month);
-    newErrors.week = validateField('week', week);
-
-    setErrors(newErrors);
-
-    // Kiểm tra nếu có lỗi
-    if (Object.values(newErrors).some((error) => error)) {
-      message.error('Please double check the input fields');
-      return false;
-    }
-
-    // Kiểm tra nếu các trường bắt buộc bị rỗng
-    if (!minute || !hour || !day || !month || !week) {
-      message.error('All fields are required');
-      return false;
-    }
-
-    return true;
+  const handleClear = () => {
+    setSelected(null);
+    setStartTime(dayjs('00:00', 'HH:mm'));
+    setEndTime(dayjs('00:00', 'HH:mm'));
+    setName('');
+    message.info('Form has been cleared!');
   };
 
   const handleSetCron = () => {
-    if (validateCron()) {
-      console.log(
-        'Cron Expression:',
-        `${cronExpression.minute} ${cronExpression.hour} ${cronExpression.day} ${cronExpression.month} ${cronExpression.week}`
-      );
-      message.success('Cron expression has been set up successfully!');
+    const minute = startTime?.minute() || 0;
+    const hour = startTime?.hour() || 0;
+    let cron = '';
+
+    switch (selected) {
+      case 'Startup':
+        cron = '@reboot';
+        break;
+      case 'Hourly':
+        cron = `0 * * * *`;
+        break;
+      case 'Daily':
+        cron = `${minute} ${hour} * * *`;
+        break;
+      case 'Weekly':
+        cron = `${minute} ${hour} * * 0`;
+        break;
+      case 'Monthly':
+        cron = `${minute} ${hour} 1 * *`;
+        break;
+      case 'Yearly':
+        cron = `${minute} ${hour} 1 1 *`;
+        break;
+      default:
+        cron = `${minute} ${hour} * * *`; // Mặc định chạy hàng ngày nếu không chọn gì
+        break;
     }
-  };
 
-  const showModal = () => {
-    setIsModalOpen(true);
-  };
-
-  const handleCancel = () => {
+    console.log('Generated Cron:', cron);
+    console.log('Start Time:', startTime?.format('HH:mm'));
+    console.log('End Time:', endTime?.format('HH:mm'));
+    message.success(`Cron expression set: ${cron}`);
     setIsModalOpen(false);
   };
-  const handleClear = () => {
-    setCronExpression({
-      minute: '',
-      hour: '',
-      day: '',
-      month: '',
-      week: '',
-    });
-    setSelected(null);
-    setJob('');
-    message.info('Form has been cleared!');
+
+  const handleFileChange = (info) => {
+    const file = info.file.originFileObj;
+    if (file && file.type === 'text/csv') {
+      console.log('Selected CSV file:', file);
+      message.success(`Imported file: ${file.name}`);
+    } else {
+      message.error('Please select a valid CSV file');
+    }
   };
 
   return (
     <>
-      <Button type="primary" onClick={showModal}>
+      <button className='button-open-modal' type="primary" onClick={showModal}>
         Add New +
-      </Button>
+      </button>
       <Modal title="Add New" open={isModalOpen} onCancel={handleCancel} footer={null}>
         <div className="modal-container">
-          <label htmlFor="name">Name (Optional)</label>
-          <Input placeholder="Please enter name" id="name" />
+          <label>Name (Optional)</label>
+          <Input
+            placeholder="Please enter name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
 
-          <label htmlFor="command">Command</label>
-          <Input placeholder="Please enter command" id="command" />
-
-          <div className="option-button">
-            <label htmlFor="">Quick Schedule</label>
-            <div className="button-group">
+          <div className="option-button" style={{ marginTop: 16 }}>
+            <label>Quick Schedule</label>
+            <div className="add-new-button-group">
               {buttons.map((button) => (
                 <Button
                   key={button}
@@ -160,46 +99,37 @@ const AddNewModal = () => {
               ))}
             </div>
           </div>
-        </div>
 
-        <div className="cron-scheduler">
-          <div className="fields">
-            {[
-              { id: 'minute', label: 'Minute (*)', placeholder: 'Minute' },
-              { id: 'hour', label: 'Hour (*)', placeholder: 'Hour' },
-              { id: 'day', label: 'Day (*)', placeholder: 'Day' },
-              { id: 'month', label: 'Month (*)', placeholder: 'Month' },
-              { id: 'week', label: 'Week (*)', placeholder: 'Week' },
-            ].map((field) => (
-              <div className="field-group" key={field.id}>
-                <label htmlFor={field.id}>{field.label}</label>
-                <Input
-                  id={field.id}
-                  placeholder={field.placeholder}
-                  value={cronExpression[field.id]}
-                  onChange={(e) => handleChange(field.id, e.target.value)}
-                  className="field"
-                  type="text"
-                  status={errors[field.id] ? 'error' : ''}
-                />
-                {errors[field.id] && (
-                  <div style={{ color: 'red', fontSize: '12px' }}>{errors[field.id]}</div>
-                )}
-              </div>
-            ))}
+          <div style={{ marginTop: 16 }}>
+            <label>Start Time</label>
+            <TimePicker
+              format="HH:mm"
+              value={startTime}
+              onChange={setStartTime}
+              style={{ width: '100%' }}
+            />
           </div>
-        </div>
-        <div className="job-wrapper">
-          <label htmlFor="job">Job</label>
-          <Input placeholder="Please enter job" id="job" />
-        </div>
-        <div className="submit-button">
-          <Button type="default" onClick={handleClear} className="clear-button">
-            Clear
-          </Button>
-          <Button type="primary" onClick={handleSetCron} className="set-button">
-            Set
-          </Button>
+
+          <div className="upload-wrapper" style={{ marginTop: 16 }}>
+            <p className="import-label">Import CSV</p>
+            <Upload
+              beforeUpload={() => false}
+              onChange={handleFileChange}
+              accept=".csv"
+              showUploadList={false}
+            >
+              <Button icon={<UploadOutlined />}>Choose CSV File</Button>
+            </Upload>
+          </div>
+
+          <div className="submit-button" style={{ marginTop: 20 }}>
+            <Button type="default" onClick={handleClear}>
+              Clear
+            </Button>
+            <Button type="primary" onClick={handleSetCron} style={{ marginLeft: 8 }}>
+              Set
+            </Button>
+          </div>
         </div>
       </Modal>
     </>

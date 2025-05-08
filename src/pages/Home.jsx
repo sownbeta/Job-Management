@@ -1,14 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Table, Button, Switch, Input, Pagination } from 'antd';
-import {
-  PlusOutlined,
-  FileTextOutlined,
-  UploadOutlined,
-  DownloadOutlined,
-  FileSyncOutlined,
-  FileSearchOutlined,
-} from '@ant-design/icons';
+import { FileTextOutlined, DownloadOutlined, FileSearchOutlined } from '@ant-design/icons';
 import AddNew from '../components/Modal/AddNew';
+import RoundedBlackButton from '../components/Button/Button';
 import '../styles/Home.css';
 
 const JobManagementSystem = () => {
@@ -58,9 +52,7 @@ const JobManagementSystem = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const jobsPerPage = 4;
 
-  // Sử dụng useMemo để lọc dữ liệu
   const filteredJobs = useMemo(() => {
-    console.log('Filtering jobs...');
     return jobs.filter(
       (job) =>
         job.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -68,9 +60,7 @@ const JobManagementSystem = () => {
     );
   }, [jobs, searchTerm]);
 
-  // Sử dụng useMemo để phân trang dữ liệu
   const paginatedJobs = useMemo(() => {
-    console.log('Paginating jobs...');
     const startIndex = (currentPage - 1) * jobsPerPage;
     return filteredJobs.slice(startIndex, startIndex + jobsPerPage);
   }, [filteredJobs, currentPage]);
@@ -124,33 +114,19 @@ const JobManagementSystem = () => {
     <div className="container">
       <div className="header">
         Job Management System
-        <button className="history-button">
-          <FileTextOutlined /> History Backup
-        </button>
-      </div>
+        <div className="button-group">
+          <AddNew />
+          <RoundedBlackButton onClick={() => console.log('Backup')}>
+            <FileTextOutlined /> Backup
+          </RoundedBlackButton>
 
-      <div className="environment-section">
-        <label className="label">Environment Variables</label>
-        <Input placeholder="# please path here" />
-      </div>
-
-      <div className="button-group">
-        <AddNew />
-        <Button type="primary" icon={<FileTextOutlined />}>
-          Backup
-        </Button>
-        <Button type="primary" icon={<UploadOutlined />}>
-          Import
-        </Button>
-        <Button type="primary" icon={<DownloadOutlined />}>
-          Export
-        </Button>
-        <Button type="primary" icon={<FileSyncOutlined />}>
-          Get From Crontab
-        </Button>
-        <Button type="primary" icon={<FileSyncOutlined />}>
-          Get From Crontab
-        </Button>
+          <RoundedBlackButton onClick={() => console.log('Export')}>
+            <DownloadOutlined /> Export
+          </RoundedBlackButton>
+          <button className="history-button">
+            <FileTextOutlined /> History Backup
+          </button>
+        </div>
       </div>
 
       <div className="table-container">

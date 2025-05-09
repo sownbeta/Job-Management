@@ -1,65 +1,80 @@
-import React, { useState, useMemo } from 'react';
-import { Table, Button, Switch, Input, Pagination } from 'antd';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Table, Button, Switch, Input, Pagination, message, dr } from 'antd';
 import { FileTextOutlined, DownloadOutlined, FileSearchOutlined } from '@ant-design/icons';
 import AddNew from '../components/Modal/AddNew';
 import RoundedBlackButton from '../components/Button/Button';
 import '../styles/Home.css';
+import { getJobs } from '../services/jobServices';
+import { toggleJob } from '../services/jobServices';
 
 const JobManagementSystem = () => {
-  const [jobs, setJobs] = useState([
-    {
-      id: 1,
-      name: 'Daily CSV Sync',
-      job: 'Daily CSV Sync',
-      status: 'Success',
-      time: '2025-04-23 10:00:00',
-      enabled: true,
-    },
-    {
-      id: 2,
-      name: 'Hourly Import Job',
-      job: 'Hourly Import Job',
-      status: 'Fail',
-      time: '2025-04-23 10:00:00',
-      enabled: false,
-    },
-    {
-      id: 3,
-      name: 'Weekly Backup',
-      job: 'Weekly Backup',
-      status: 'Running',
-      time: '2025-04-23 10:00:00',
-      enabled: true,
-    },
-    {
-      id: 4,
-      name: 'CSV Merge Append',
-      job: 'CSV Merge Append',
-      status: 'Success',
-      time: '2025-04-23 10:00:00',
-      enabled: true,
-    },
-    {
-      id: 5,
-      name: 'CSV Merge Append',
-      job: 'CSV Merge Append',
-      status: 'Success',
-      time: '2025-04-23 10:00:00',
-      enabled: true,
-    },
-  ]);
+  const [jobsObj, setJobsObj] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const jobsPerPage = 4;
+  const jobsPerPage = 7;
+
+  const updatedJobs = async () => {
+    try {
+      const response = await getJobs();
+      if (response) {
+        setJobsObj(response || []);
+        return response;
+      }
+    } catch (error) {
+      message.error('Lỗi khi tải danh sách công việc.', error);
+    }
+  };
+  const handleDelete = (id) => {
+    Modal.confirm({
+      title: `Are you sure you want to delete job ${id}?`,
+      content: 'This action cannot be undone.',
+      okText: 'Delete',
+      async onOk() {
+        setIsLoading(true);
+        try {
+          await deleteJobs(id);
+          setJobs((prev) => prev.filter((job) => job.id !== id));
+          updatedJobs();
+          message.success('Job deleted successfully!');
+        } catch (error) {
+          message.error('Error deleting job.', error);
+        } finally {
+          setIsLoading(false);
+        }
+      },
+    });
+  };
+
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const response = await updatedJobs();
+        if (response && typeof response === 'object') {
+          setJobsObj(response);
+        } else {
+          setJobsObj({});
+        }
+      } catch (error) {
+        message.error('Lỗi khi tải danh sách công việc.', error);
+      }
+    };
+    fetchJobs();
+  }, []);
+
+  console.log('Jobs Object:', jobsObj);
+
+  const jobArray = useMemo(() => Object.values(jobsObj), [jobsObj]);
 
   const filteredJobs = useMemo(() => {
-    return jobs.filter(
+    return jobArray.filter(
       (job) =>
-        job.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.job.toLowerCase().includes(searchTerm.toLowerCase())
+        job.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job.job?.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [jobs, searchTerm]);
+  }, [jobArray, searchTerm]);
 
+  // Paginated jobs
   const paginatedJobs = useMemo(() => {
     const startIndex = (currentPage - 1) * jobsPerPage;
     return filteredJobs.slice(startIndex, startIndex + jobsPerPage);
@@ -67,15 +82,27 @@ const JobManagementSystem = () => {
 
   const totalJobs = filteredJobs.length;
 
-  const handleToggle = (id) => {
-    setJobs(jobs.map((job) => (job.id === id ? { ...job, enabled: !job.enabled } : job)));
+  const toggleJobStatus = async (id) => {
+    try {
+      setIsLoading(true);
+      await toggleJob(id);
+      setJobsObj((prevJobs) =>
+        prevJobs.map((job) => (job.id === id ? { ...job, is_active: !job.is_active } : job))
+      );
+      updatedJobs();
+      message.success('Job status updated successfully!');
+    } catch (error) {
+      console.error('Error updating job status:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const columns = [
     {
       title: '#',
-      key: 'index',
-      render: (_, __, index) => (currentPage - 1) * jobsPerPage + index + 1,
+      key: 'id',
+      dataIndex: 'id', // Use the database id directly
     },
     {
       title: 'Name',
@@ -83,19 +110,14 @@ const JobManagementSystem = () => {
       key: 'name',
     },
     {
-      title: 'Job',
-      dataIndex: 'job',
-      key: 'job',
-    },
-    {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => <span className={`status ${status.toLowerCase()}`}>{status}</span>,
+      render: (status) => <span className={`status ${status?.toLowerCase()}`}>{status}</span>,
     },
     {
       title: 'Time (JST)',
-      dataIndex: 'time',
+      dataIndex: 'cron_schedule',
       key: 'time',
     },
     {
@@ -103,8 +125,7 @@ const JobManagementSystem = () => {
       key: 'action',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Switch checked={record.enabled} onChange={() => handleToggle(record.id)} />
-          <span>⋮</span>
+          <Switch checked={record?.is_active} onChange={() => toggleJobStatus(record?.id)} />
         </div>
       ),
     },
@@ -140,7 +161,15 @@ const JobManagementSystem = () => {
           />
         </div>
 
-        <Table columns={columns} dataSource={paginatedJobs} pagination={false} rowKey="id" />
+        <div style={{ flexGrow: 1 }}>
+          <Table
+            columns={columns}
+            dataSource={paginatedJobs}
+            pagination={false}
+            rowKey="id"
+            scroll={{ y: 460 }}
+          />
+        </div>
 
         <div className="pagination">
           <div>Total Job: {totalJobs}</div>

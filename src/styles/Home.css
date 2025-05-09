@@ -1,7 +1,9 @@
 .container {
   padding: 20px;
   background-color: #f5f7fa;
+  width: 100%;
   min-height: 100vh;
+  box-sizing: border-box;
 }
 
 .header {
@@ -14,11 +16,18 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  box-shadow: 0px 0px 10px rgba(112, 111, 111, 0.5);
+  flex-wrap: wrap;
 }
 
+.button-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .history-button {
   background: none;
-  border: dotted 1px white;
+  border: 1px dotted white;
   border-radius: 5px;
   color: white;
   font-size: 14px;
@@ -26,20 +35,12 @@
   display: flex;
   align-items: center;
   gap: 5px;
+  padding: 5px 10px;
+  transition: background-color 0.2s ease;
 }
 
-
-
-.label {
-  font-size: 14px;
-  font-weight: bold;
-  margin-bottom: 5px;
-  display: block;
-}
-
-.button-group {
-  display: flex;
-  gap: 10px;
+.history-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .table-container {
@@ -47,44 +48,60 @@
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   padding: 20px;
+  margin-top: 40px;
+  height: calc(90vh - 180px);
+  display: flex;
+  flex-direction: column;
+}
+
+.table-container > div:first-child {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
 }
 
 .status {
   display: flex;
   align-items: center;
   gap: 5px;
+  font-weight: 500;
+  text-transform: capitalize;
 }
 
-.status.success::before {
+.status::before {
   content: '';
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  display: inline-block;
+}
+
+.status.success::before {
   background-color: green;
 }
 
 .status.fail::before {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
   background-color: red;
 }
 
 .status.running::before {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
   background-color: gray;
 }
 
 .pagination {
-  margin-top: 10px;
+  width: 100%;
+  margin-top: 20px;
+  padding: 10px 30px;
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
+
 .button-open-modal {
   width: 100px;
   height: 30px;
@@ -99,6 +116,7 @@
     transform 0.2s ease,
     background-color 0.2s ease;
 }
+
 .button-open-modal:hover {
   background-color: #333;
   transform: scale(1.05);
@@ -106,4 +124,17 @@
 
 .button-open-modal:active {
   transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .button-group {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }

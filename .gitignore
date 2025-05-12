@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Thêm dòng này để bỏ qua package-lock.json
+package-lock.json

@@ -1,30 +1,41 @@
-import  { useState } from 'react';
-import { Modal, Button, Input, Upload, message } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Button, DatePicker, Form, Input, message, Modal, Upload, Radio, Select } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
+import { uploadFile, updateJob } from '../../services/jobServices';
+import moment from 'moment';
+import 'moment-timezone';
+import cronstrue from 'cronstrue';
 import './AddNew.css';
-import { uploadFile } from '../../services/jobServices';
-import {dateToCronb } from '../../util/helper';
+import RoundedBlackButton from '../Button/Button';
 
-const AddNewModal = () => {
+const { Option } = Select;
+
+const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState(null);
+  const [form] = Form.useForm();
   const [isLoading, setIsLoading] = useState(false);
-  const [data, setData] = useState({
-    name: '',
-    startDate: new Date().getTime(),
-  });
-  const showModal = () => setIsModalOpen(true);
-  const handleCancel = () => {
-    setIsModalOpen(false);
-    handleClear();
-  };
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [scheduleType, setScheduleType] = useState('daily');
+  const [cronPreview, setCronPreview] = useState('');
 
-  const handleClear = () => {
-    setUploadedFile(null);
-    setData({ name: '', startDate: new Date().getTime() });
-    message.info('Form has been cleared!');
-  };
+  useEffect(() => {
+    if (editingJob) {
+      setIsModalOpen(true);
+      const scheduleType = editingJob.cron_schedule?.includes('?') ? 'custom' : 'daily';
+      form.setFieldsValue({
+        name: editingJob.name,
+        cron_schedule: editingJob.cron_schedule ? moment(editingJob.cron_schedule) : moment(),
+        source_folder: editingJob.source_folder,
+        destination_folder: editingJob.destination_folder,
+        schedule_type: scheduleType,
+        custom_cron: editingJob.cron_schedule,
+        day_of_week: editingJob.day_of_week,
+        day_of_month: editingJob.day_of_month,
+      });
+      setScheduleType(scheduleType);
+      updateCronPreview(editingJob.cron_schedule || '');
+    }
+  }, [editingJob, form]);
 
   const handleFileChange = (file) => {
     if (file.type !== 'text/csv') {
@@ -32,91 +43,264 @@ const AddNewModal = () => {
       return false;
     }
     setUploadedFile(file);
-    message.success(`Selected file: ${file.name}`);
-    return false; 
+    return false;
   };
 
-
-
-  const handleSubmit = async () => {
-    if (!uploadedFile) {
-      message.error('Please select a CSV file.');
-      return;
+  const handleScheduleTypeChange = (e) => {
+    const value = e.target.value;
+    setScheduleType(value);
+    if (value !== 'custom') {
+      const cron_schedule = form.getFieldValue('cron_schedule');
+      if (cron_schedule) {
+        const cron = generateCron(
+          cron_schedule,
+          value,
+          form.getFieldValue('day_of_week'),
+          form.getFieldValue('day_of_month')
+        );
+        updateCronPreview(cron);
+      }
     }
-    if (!data.name) {
-      message.error('Please enter input name.');
-      return;
-    }
+  };
 
+  const updateCronPreview = (cron) => {
+    try {
+      const description = cronstrue.toString(cron, { throwExceptionOnParseError: true });
+      setCronPreview(description);
+    } catch {
+      setCronPreview('Invalid cron expression');
+    }
+  };
+
+  const generateCron = (date, type, dayOfWeek, dayOfMonth) => {
+    if (type === 'custom') return form.getFieldValue('custom_cron') || '0 0 * * *';
+    if (!date) return '';
+    const minute = date.minute();
+    const hour = date.hour();
+    if (type === 'run_once') {
+      const day = date.date();
+      const month = date.month() + 1;
+      const year = date.year();
+      return `${minute} ${hour} ${day} ${month} ? ${year}`;
+    }
+    if (type === 'daily') {
+      return `${minute} ${hour} * * *`;
+    }
+    if (type === 'weekly') {
+      return `${minute} ${hour} * * ${dayOfWeek || '*'}`;
+    }
+    if (type === 'monthly') {
+      return `${minute} ${hour} ${dayOfMonth || 1} * *`;
+    }
+    return '';
+  };
+
+  const handleCronScheduleChange = (date) => {
+    if (date && scheduleType !== 'custom') {
+      const cron = generateCron(
+        date,
+        scheduleType,
+        form.getFieldValue('day_of_week'),
+        form.getFieldValue('day_of_month')
+      );
+      updateCronPreview(cron);
+    }
+  };
+
+  const handleCustomCronChange = (e) => {
+    const cron = e.target.value;
+    updateCronPreview(cron);
+  };
+
+  const handleSubmit = async (values) => {
     setIsLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('job_name', data.name);
-      formData.append('cron_schedule', dateToCronb(data.startDate));
-      formData.append('file', uploadedFile);
+      const cron_schedule =
+        scheduleType === 'custom'
+          ? values.custom_cron
+          : generateCron(
+              values.cron_schedule,
+              scheduleType,
+              values.day_of_week,
+              values.day_of_month
+            );
 
-      const response = await uploadFile(formData);
-      if (response) {
+      if (editingJob) {
+        // Update existing job
+        const updates = {
+          name: values.name,
+          cron_schedule,
+          source_folder: values.source_folder,
+          destination_folder: values.destination_folder,
+          day_of_week: values.day_of_week,
+          day_of_month: values.day_of_month,
+        };
+        await updateJob(editingJob.id, updates);
+        message.success('Job updated successfully!');
+      } else {
+        // Create new job
+        if (!uploadedFile) {
+          message.error('Please select a CSV file.');
+          return;
+        }
+        const formData = new FormData();
+        formData.append('job_name', values.name);
+        formData.append('cron_schedule', cron_schedule);
+        formData.append('file', uploadedFile);
+        formData.append('source_folder', values.source_folder);
+        formData.append('destination_folder', values.destination_folder);
+        if (values.day_of_week) formData.append('day_of_week', values.day_of_week);
+        if (values.day_of_month) formData.append('day_of_month', values.day_of_month);
+        await uploadFile(formData);
         message.success('Job created and file uploaded successfully!');
-        handleCancel(); 
       }
+      handleCancel(); // Ensure modal is closed after submission
+      if (refreshJobs) refreshJobs();
     } catch (error) {
-      console.error('Upload error:', error);
-      message.error('File upload failed. Please try again.');
+      console.error('Error:', error);
+      message.error('Operation failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleCancel = () => {
+    setIsModalOpen(false);
+    form.resetFields();
+    setUploadedFile(null);
+    setScheduleType('daily');
+    setCronPreview('');
+    if (onClose) onClose(); 
+  };
+
   return (
     <>
-      <button className="button-open-modal" type="primary" onClick={showModal}>
-        Add New +
-      </button>
-      <Modal title="Add New Job" open={isModalOpen} onCancel={handleCancel} footer={null}>
-        <div className="modal-container">
-          <label>Job Name</label>
-          <Input
-            placeholder="Enter job name"
-            value={data.name}
-            onChange={(e) => setData({ ...data, name: e.target.value })}
-          />
-          <div style={{ marginTop: 16 }}>
-            <label>Cron Schedule</label>
-            <input
-              min={new Date().toISOString().slice(0, 16)}
-              type="datetime-local"
-              value={data.startDate ? dayjs(data.startDate).format('YYYY-MM-DDTHH:mm') : ''}
-              onChange={(e) => {
-                const value = dayjs(e.target.value).valueOf();
-                setData({ ...data, startDate: value });
-              }}
-              style={{ width: '100%', marginTop: 8 }}
-            />
-          </div>
-
-          <div className="upload-wrapper" style={{ marginTop: 16 }}>
-            <p className="import-label">Import CSV</p>
-            <Upload beforeUpload={handleFileChange} accept=".csv" showUploadList={false}>
-              <Button icon={<UploadOutlined />}>Select File</Button>
-            </Upload>
-            {uploadedFile && <p>Selected File: {uploadedFile.name}</p>}
-          </div>
-
-          <div className="submit-button" style={{ marginTop: 20 }}>
-            <Button type="default" onClick={handleClear}>
-              Clear
-            </Button>
-            <Button
-              type="primary"
-              onClick={handleSubmit}
-              loading={isLoading}
-              style={{ marginLeft: 8 }}
+      {!editingJob && (
+        <RoundedBlackButton type="primary" onClick={() => setIsModalOpen(true)}>
+          Add New +
+        </RoundedBlackButton>
+      )}
+      <Modal
+        title={editingJob ? 'Edit Job' : 'Add New Job'}
+        open={isModalOpen}
+        onCancel={handleCancel}
+        footer={null}
+        width={600}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          initialValues={{
+            schedule_type: 'daily',
+            cron_schedule: moment().tz('Asia/Tokyo'),
+          }}
+        >
+          <Form.Item
+            label="Job Name"
+            name="name"
+            rules={[{ required: true, message: 'Please enter the job name' }]}
+          >
+            <Input placeholder="Enter job name" />
+          </Form.Item>
+          <Form.Item
+            label="Schedule Type"
+            name="schedule_type"
+            rules={[{ required: true, message: 'Please select a schedule type' }]}
+          >
+            <Radio.Group onChange={handleScheduleTypeChange}>
+              <Radio value="run_once">Run Once</Radio>
+              <Radio value="daily">Daily</Radio>
+              <Radio value="weekly">Weekly</Radio>
+              <Radio value="monthly">Monthly</Radio>
+              <Radio value="custom">Custom</Radio>
+            </Radio.Group>
+          </Form.Item>
+          {scheduleType === 'weekly' && (
+            <Form.Item
+              label="Day of Week"
+              name="day_of_week"
+              rules={[{ required: true, message: 'Please select a day of the week' }]}
             >
-              Create Job
+              <Select placeholder="Select day of week">
+                <Option value="0">Sunday</Option>
+                <Option value="1">Monday</Option>
+                <Option value="2">Tuesday</Option>
+                <Option value="3">Wednesday</Option>
+                <Option value="4">Thursday</Option>
+                <Option value="5">Friday</Option>
+                <Option value="6">Saturday</Option>
+              </Select>
+            </Form.Item>
+          )}
+          {scheduleType === 'monthly' && (
+            <Form.Item
+              label="Day of Month"
+              name="day_of_month"
+              rules={[{ required: true, message: 'Please select a day of the month' }]}
+            >
+              <Select placeholder="Select day of month">
+                {Array.from({ length: 31 }, (_, i) => (
+                  <Option key={i + 1} value={String(i + 1)}>
+                    {i + 1}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          )}
+          {scheduleType !== 'custom' && (
+            <Form.Item
+              label="Cron Schedule"
+              name="cron_schedule"
+              rules={[{ required: true, message: 'Please select a cron schedule' }]}
+            >
+              <DatePicker
+                showTime
+                format="YYYY-MM-DD HH:mm:ss"
+                placeholder="Select schedule"
+                onChange={handleCronScheduleChange}
+                defaultPickerValue={moment().tz('Asia/Tokyo')}
+              />
+            </Form.Item>
+          )}
+          {scheduleType === 'custom' && (
+            <Form.Item
+              label="Custom Cron Expression"
+              name="custom_cron"
+              rules={[{ required: true, message: 'Please enter a cron expression' }]}
+            >
+              <Input
+                placeholder="Enter cron expression (e.g., 0 0 12 * * ?)"
+                onChange={handleCustomCronChange}
+              />
+            </Form.Item>
+          )}
+          {cronPreview && (
+            <Form.Item label="Schedule Preview">
+              <p style={{ color: cronPreview.includes('Invalid') ? 'red' : 'green' }}>
+                {cronPreview}
+              </p>
+            </Form.Item>
+          )}
+          {!editingJob && (
+            <Form.Item
+              label="Source File"
+              name="source_file"
+              rules={[{ required: true, message: 'Please select a source file' }]}
+            >
+              <Upload beforeUpload={handleFileChange} showUploadList={false}>
+                <Button icon={<UploadOutlined />}>Select File</Button>
+              </Upload>
+              {uploadedFile && <p>Selected File: {uploadedFile.name}</p>}
+            </Form.Item>
+          )}
+          <Form.Item>
+            <Button onClick={handleCancel}>Cancel</Button>
+            <Button type="primary" htmlType="submit" loading={isLoading} style={{ marginLeft: 8 }}>
+              {editingJob ? 'Update Job' : 'Create'}
             </Button>
-          </div>
-        </div>
+          </Form.Item>
+        </Form>
       </Modal>
     </>
   );

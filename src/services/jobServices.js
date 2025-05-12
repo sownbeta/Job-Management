@@ -1,64 +1,25 @@
 import { get, post } from '../util/axiosConfig.js';
 
-export const getJobs = async () => {
+const handleRequest = async (method, url, data = null, headers = {}) => {
   try {
-    const response = await get('/jobs');
-    console.log('ok',response);
-    
-    return response || [];
+    const response = await method(url, data, { headers });
+    console.log(`Request to ${url} successful:`, response);
+    return response;
   } catch (error) {
-    console.error('Error in getJobs:', error);
+    console.error(`Error in request to ${url}:`, error);
     throw error;
   }
 };
 
-export const getJobById = async (id) => {
-  try {
-    return await get(`/job/${id}`);
-  } catch (error) {
-    console.error('Error in getJobById:', error);
-    throw error;
-  }
-};
+export const getJobs = () => handleRequest(get, '/jobs');
 
-export const deleteJob = async (id) => {
-  try {
-    return await post(`/delete-job/${id}`);
-  } catch (error) {
-    console.error('Error in deleteJob:', error);
-    throw error;
-  }
-};
+export const getJobById = (id) => handleRequest(get, `/job/${id}`);
 
-export const updateJob = async (id) => {
-  try {
-    return await post(`/edit-job/${id}`);
-  } catch (error) {
-    console.error('Error in updateJob:', error);
-    throw error;
-  }
-};
+export const deleteJob = (id) => handleRequest(post, `/delete-job/${id}`);
 
-export const toggleJob = async (id) => {
-  try {
-   const respone = await post(`/toggle-job/${id}`);
-    console.log(respone);
-    return respone;
-  } catch (error) {
-    console.error('Error in toggleJob:', error);
-    throw error;
-  }
-};
+export const updateJob = (id, data) => handleRequest(post, `/edit-job/${id}`, data);
 
-export const uploadFile = async (formData) => {
-  try {
-    return await post('/upload-file', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  } catch (error) {
-    console.error('Error uploading file:', error);
-    throw error;
-  }
-};
+export const toggleJob = (id) => handleRequest(post, `/toggle-job/${id}`);
+
+export const uploadFile = (formData) =>
+  handleRequest(post, '/upload-file', formData, { 'Content-Type': 'multipart/form-data' });

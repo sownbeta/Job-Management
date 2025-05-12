@@ -1,7 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap');
 html {
   padding: 0;
   margin: 0;
   font-size: 62.5%;
+  font-family: 'Quicksand', sans-serif;
 }
 
 body {
@@ -11,7 +13,6 @@ body {
   background-color: #f5f7fa;
   font-family: 'Quicksand', sans-serif;
   background-repeat: no-repeat;
-  /* Do not repeat the image */
   background-size: cover;
 }
 

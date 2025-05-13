@@ -72,7 +72,7 @@ const HistoryBackupModal = ({ visible, onClose }) => {
     },
     {
       title: 'Folder Created',
-      dataIndex: 'folder_created',
+      dataIndex: 'destination_folder',
       key: 'folder_created',
     },
     {
@@ -83,7 +83,7 @@ const HistoryBackupModal = ({ visible, onClose }) => {
   ];
 
   return (
-    <Modal title="History Backup" visible={visible} onCancel={onClose} footer={null} width={800}>
+    <Modal title="History Backup" visible={visible} onCancel={onClose} footer={null} width={"80vw"}>
       <Table
         columns={historyColumns}
         dataSource={historyData}

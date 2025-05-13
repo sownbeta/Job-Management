@@ -44,25 +44,46 @@ const JobManagementSystem = () => {
   }, [refreshTrigger]);
 
   const renderJSTTime = (cronSchedule) => {
-    if (!cronSchedule) return 'N/A'; // Handle null or undefined time
+    if (!cronSchedule) return 'N/A';
     try {
-      const [minute, hour] = cronSchedule.split(' ');
-      const date = new Date();
-      date.setUTCHours(parseInt(hour), parseInt(minute), 0, 0);
-      const jstDate = new Date(date.getTime() + 9 * 60 * 60 * 1000); // Convert to JST (UTC+9)
+      const [minute, hour] = cronSchedule.split(' ').map(Number);
+      if (cronSchedule === '* * * * *') return '毎分 ( Every minute )';
+      // Kiểm tra giá trị hợp lệ
+      if (isNaN(minute) || isNaN(hour) || minute < 0 || minute > 59 || hour < 0 || hour > 23) {
+        return 'Invalid Time';
+      }
 
-      const year = jstDate.getFullYear();
-      const month = jstDate.getMonth() + 1;
-      const day = jstDate.getDate();
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const day = now.getDate();
 
-      const formattedTime = jstDate.toLocaleString('ja-JP', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
+      const vietnamDate = new Date(year, month, day, hour, minute, 0, 0);
+      if (isNaN(vietnamDate.getTime())) {
+        return 'Invalid Time';
+      }
 
-      return `${year}年${month}月${day}日 ${formattedTime} JST`;
-    } catch {
+      const jstDate = new Date(vietnamDate.getTime() + 2 * 60 * 60 * 1000);
+
+      const jstYear = jstDate.getFullYear();
+      const jstMonth = jstDate.getMonth() + 1;
+      const jstDay = jstDate.getDate();
+
+      const formattedTime = !isNaN(jstDate.getTime())
+        ? jstDate.toLocaleString('ja-JP', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          })
+        : 'Invalid Time';
+
+      if (isNaN(jstYear) || isNaN(jstMonth) || isNaN(jstDay) || formattedTime === 'Invalid Time') {
+        return 'Invalid Time';
+      }
+
+      return `${jstYear}年${jstMonth}月${jstDay}日 ${formattedTime} JST`;
+    } catch (error) {
+      console.error('Error parsing cronSchedule:', error);
       return 'Invalid Time';
     }
   };
@@ -143,6 +164,23 @@ const JobManagementSystem = () => {
 
   const totalJobs = filteredJobs.length;
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      const nowVN = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+
+      job.forEach((jobItem) => {
+        const [minute, hour] = jobItem.cron_schedule.split(' ').map(Number);
+        if (nowVN.getUTCHours() === hour && nowVN.getUTCMinutes() === minute) {
+          // Cập nhật trạng thái hoặc gọi API nếu cần
+          // Ví dụ: setRefreshTrigger((prev) => prev + 1);
+        }
+      });
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [job]);
+
   const columns = [
     {
       title: '#',
@@ -216,7 +254,7 @@ const JobManagementSystem = () => {
           <Input
             placeholder="Search jobs"
             prefix={<FileSearchOutlined />}
-            style={{ width: 200 }}
+            style={{ width: 300 }}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -233,7 +271,9 @@ const JobManagementSystem = () => {
         </div>
 
         <div className="pagination">
-          <div>Total Job: {totalJobs}</div>
+          <div>
+            Total Job: <span className='total-job'>{totalJobs}</span>
+          </div>
           <Pagination
             current={currentPage}
             pageSize={jobsPerPage}

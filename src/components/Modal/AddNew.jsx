@@ -17,6 +17,8 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [scheduleType, setScheduleType] = useState('daily');
   const [cronPreview, setCronPreview] = useState('');
+  const [selectedHour, setSelectedHour] = useState('0');
+  const [selectedMinute, setSelectedMinute] = useState('0');
 
   useEffect(() => {
     if (editingJob) {
@@ -95,7 +97,70 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
     return '';
   };
 
+  const generateCronFromSelect = (hour, minute, type, dayOfWeek, dayOfMonth) => {
+    if (type === 'custom') return form.getFieldValue('custom_cron') || '0 0 * * *';
+    if (type === 'run_once') {
+      // Lấy ngày và tháng từ trường cron_schedule nếu là moment, nếu không thì dùng ngày hiện tại
+      const cronScheduleValue = form.getFieldValue('cron_schedule');
+      let day = 1,
+        month = 1;
+      if (
+        cronScheduleValue &&
+        typeof cronScheduleValue === 'object' &&
+        typeof cronScheduleValue.date === 'function'
+      ) {
+        day = cronScheduleValue.date();
+        month = cronScheduleValue.month() + 1;
+      } else {
+        const now = new Date();
+        day = now.getDate();
+        month = now.getMonth() + 1;
+      }
+      return `${minute} ${hour} ${day} ${month} *`;
+    }
+    if (type === 'daily') {
+      return `${minute} ${hour} * * *`;
+    }
+    if (type === 'weekly') {
+      return `${minute} ${hour} * * ${dayOfWeek || '*'}`;
+    }
+    if (type === 'monthly') {
+      return `${minute} ${hour} ${dayOfMonth || 1} * *`;
+    }
+    return '0 0 * * *';
+  };
+
+  const handleHourChange = (e) => {
+    setSelectedHour(e.target.value);
+    if (scheduleType !== 'custom') {
+      const cron = generateCronFromSelect(
+        e.target.value,
+        selectedMinute,
+        scheduleType,
+        form.getFieldValue('day_of_week'),
+        form.getFieldValue('day_of_month')
+      );
+      updateCronPreview(cron);
+    }
+  };
+
+  const handleMinuteChange = (e) => {
+    setSelectedMinute(e.target.value);
+    if (scheduleType !== 'custom') {
+      const cron = generateCronFromSelect(
+        selectedHour,
+        e.target.value,
+        scheduleType,
+        form.getFieldValue('day_of_week'),
+        form.getFieldValue('day_of_month')
+      );
+      updateCronPreview(cron);
+    }
+  };
+
   const handleCronScheduleChange = (date) => {
+    console.log('Selected date:', date);
+
     if (date && scheduleType !== 'custom') {
       const cron = generateCron(
         date,
@@ -115,15 +180,18 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
   const handleSubmit = async (values) => {
     setIsLoading(true);
     try {
-      const cron_schedule =
-        scheduleType === 'custom'
-          ? values.custom_cron
-          : generateCron(
-              values.cron_schedule,
-              scheduleType,
-              values.day_of_week,
-              values.day_of_month
-            );
+      let cron_schedule;
+      if (scheduleType === 'custom') {
+        cron_schedule = values.custom_cron;
+      } else {
+        cron_schedule = generateCronFromSelect(
+          selectedHour,
+          selectedMinute,
+          scheduleType,
+          values.day_of_week,
+          values.day_of_month
+        );
+      }
 
       if (editingJob) {
         // Update existing job
@@ -147,10 +215,11 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
         formData.append('job_name', values.name);
         formData.append('cron_schedule', cron_schedule);
         formData.append('file', uploadedFile);
-        formData.append('source_folder', values.source_folder);
-        formData.append('destination_folder', values.destination_folder);
+        formData.append('source_folder', values.source_folder || '');
+        formData.append('destination_folder', values.destination_folder || '');
         if (values.day_of_week) formData.append('day_of_week', values.day_of_week);
         if (values.day_of_month) formData.append('day_of_month', values.day_of_month);
+        formData.append('is_active', 'true'); // Thêm dòng này để job tự động chạy sau khi tạo
         await uploadFile(formData);
         message.success('Job created and file uploaded successfully!');
       }
@@ -170,7 +239,7 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
     setUploadedFile(null);
     setScheduleType('daily');
     setCronPreview('');
-    if (onClose) onClose(); 
+    if (onClose) onClose();
   };
 
   return (
@@ -193,7 +262,7 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
           onFinish={handleSubmit}
           initialValues={{
             schedule_type: 'daily',
-            cron_schedule: moment().tz('Asia/Tokyo'),
+            cron_schedule: moment().tz('Asia/Ho_Chi_Minh'),
           }}
         >
           <Form.Item
@@ -254,13 +323,24 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
               name="cron_schedule"
               rules={[{ required: true, message: 'Please select a cron schedule' }]}
             >
-              <DatePicker
-                showTime
-                format="YYYY-MM-DD HH:mm:ss"
-                placeholder="Select schedule"
-                onChange={handleCronScheduleChange}
-                defaultPickerValue={moment().tz('Asia/Tokyo')}
-              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <label>Hour:</label>
+                <select value={selectedHour} onChange={handleHourChange}>
+                  {[...Array(24).keys()].map((h) => (
+                    <option key={h} value={h}>
+                      {h.toString().padStart(2, '0')}
+                    </option>
+                  ))}
+                </select>
+                <label>Minute:</label>
+                <select value={selectedMinute} onChange={handleMinuteChange}>
+                  {[...Array(60).keys()].map((m) => (
+                    <option key={m} value={m}>
+                      {m.toString().padStart(2, '0')}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </Form.Item>
           )}
           {scheduleType === 'custom' && (

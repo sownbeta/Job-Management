@@ -12,7 +12,7 @@ const HistoryBackupModal = ({ visible, onClose }) => {
       const [minute, hour] = cronSchedule.split(' ');
       const date = new Date();
       date.setUTCHours(parseInt(hour), parseInt(minute), 0, 0);
-      const jstDate = new Date(date.getTime() + 9 * 60 * 60 * 1000); // Convert to JST (UTC+9)
+      const jstDate = new Date(date.getTime() + 9 * 60 * 60 * 1000); 
 
       const year = jstDate.getFullYear();
       const month = jstDate.getMonth() + 1;
@@ -30,10 +30,32 @@ const HistoryBackupModal = ({ visible, onClose }) => {
     }
   };
 
+  // Hàm convert cron thành mô tả lịch chạy
+  const cronToScheduleText = (cron) => {
+    if (!cron) return 'N/A';
+    const parts = cron.split(' ');
+    if (parts.length < 5) return 'Invalid';
+    const [min, hour, dom, month, dow] = parts;
+
+    if (min === '*' && hour === '*' && dom === '*' && month === '*' && dow === '*') {
+      return 'Every minute';
+    }
+    if (dom === '*' && month === '*' && dow === '*') {
+      return `Every day at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    }
+    if (dom === '*' && month === '*' && dow !== '*') {
+      return `Every week on ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][parseInt(dow, 10)]} at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    }
+    if (dom !== '*' && month === '*' && dow === '*') {
+      return `Every month on day ${dom} at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    }
+    return cron;
+  };
+
   const fetchHistoryData = async () => {
     try {
       setIsLoading(true);
-      const response = await getJobs(); // Replace with actual API for history
+      const response = await getJobs(); 
       setHistoryData(response || []);
     } catch (error) {
       message.error('Error fetching history data.', error);
@@ -76,14 +98,30 @@ const HistoryBackupModal = ({ visible, onClose }) => {
       key: 'folder_created',
     },
     {
-      title: 'Schedule',
-      dataIndex: 'schedule',
-      key: 'schedule',
+      title: 'Last Run Time',
+      dataIndex: 'last_run_time',
+      key: 'last_run_time',
+      render: (value) =>
+        value
+          ? new Date(value).toLocaleString('ja-JP', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+            })
+          : 'N/A',
+    },
+    {
+      title: 'Next Time Run',
+      key: 'next_time_run',
+      render: (_, record) => cronToScheduleText(record.cron_schedule),
     },
   ];
 
   return (
-    <Modal title="History Backup" visible={visible} onCancel={onClose} footer={null} width={"80vw"}>
+    <Modal title="History Backup" open={visible} onCancel={onClose} footer={null} width={'90vw'}>
       <Table
         columns={historyColumns}
         dataSource={historyData}

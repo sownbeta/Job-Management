@@ -7,7 +7,7 @@ import {
   FileSearchOutlined,
   DownOutlined,
 } from '@ant-design/icons';
-import AddNewModal from '../components/Modal/AddNew';
+import AddNewModal from '../components/AddNew/AddNew';
 import RoundedBlackButton from '../components/Button/Button';
 import { deleteJob, getJobs, toggleJob } from '../services/jobServices';
 import Loading from '../components/Loading/Loading';
@@ -150,11 +150,7 @@ const JobManagementSystem = () => {
   const jobArray = useMemo(() => Object.values(job), [job]);
 
   const filteredJobs = useMemo(() => {
-    return jobArray.filter(
-      (job) =>
-        job.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.job?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    return jobArray.filter((job) => job.name?.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [jobArray, searchTerm]);
 
   const paginatedJobs = useMemo(() => {
@@ -197,6 +193,22 @@ const JobManagementSystem = () => {
       dataIndex: 'status',
       key: 'status',
       render: (status) => <span className={`status ${status?.toLowerCase()}`}>{status}</span>,
+    },
+    {
+      title: 'Last Run Time',
+      dataIndex: 'last_run_time',
+      key: 'last_run_time',
+      render: (value) =>
+        value
+          ? new Date(value).toLocaleString('ja-JP', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+            })
+          : 'N/A',
     },
     {
       title: 'Time (JST)',
@@ -272,7 +284,7 @@ const JobManagementSystem = () => {
 
         <div className="pagination">
           <div>
-            Total Job: <span className='total-job'>{totalJobs}</span>
+            Total Job: <span className="total-job">{totalJobs}</span>
           </div>
           <Pagination
             current={currentPage}

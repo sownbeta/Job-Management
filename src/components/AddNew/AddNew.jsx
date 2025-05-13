@@ -1,5 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Button, DatePicker, Form, Input, message, Modal, Upload, Radio, Select } from 'antd';
+import {
+  Button,
+  DatePicker,
+  TimePicker,
+  Form,
+  Input,
+  message,
+  Modal,
+  Upload,
+  Radio,
+  Select,
+} from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { uploadFile, updateJob } from '../../services/jobServices';
 import moment from 'moment';
@@ -17,8 +28,7 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [scheduleType, setScheduleType] = useState('daily');
   const [cronPreview, setCronPreview] = useState('');
-  const [selectedHour, setSelectedHour] = useState('0');
-  const [selectedMinute, setSelectedMinute] = useState('0');
+  const [selectedTime, setSelectedTime] = useState(null);
 
   useEffect(() => {
     if (editingJob) {
@@ -100,7 +110,6 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
   const generateCronFromSelect = (hour, minute, type, dayOfWeek, dayOfMonth) => {
     if (type === 'custom') return form.getFieldValue('custom_cron') || '0 0 * * *';
     if (type === 'run_once') {
-      // Lấy ngày và tháng từ trường cron_schedule nếu là moment, nếu không thì dùng ngày hiện tại
       const cronScheduleValue = form.getFieldValue('cron_schedule');
       let day = 1,
         month = 1;
@@ -130,26 +139,14 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
     return '0 0 * * *';
   };
 
-  const handleHourChange = (e) => {
-    setSelectedHour(e.target.value);
-    if (scheduleType !== 'custom') {
+  const handleTimeChange = (time) => {
+    setSelectedTime(time);
+    if (time && scheduleType !== 'custom') {
+      const hour = time.hour();
+      const minute = time.minute();
       const cron = generateCronFromSelect(
-        e.target.value,
-        selectedMinute,
-        scheduleType,
-        form.getFieldValue('day_of_week'),
-        form.getFieldValue('day_of_month')
-      );
-      updateCronPreview(cron);
-    }
-  };
-
-  const handleMinuteChange = (e) => {
-    setSelectedMinute(e.target.value);
-    if (scheduleType !== 'custom') {
-      const cron = generateCronFromSelect(
-        selectedHour,
-        e.target.value,
+        hour,
+        minute,
         scheduleType,
         form.getFieldValue('day_of_week'),
         form.getFieldValue('day_of_month')
@@ -184,9 +181,11 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
       if (scheduleType === 'custom') {
         cron_schedule = values.custom_cron;
       } else {
+        let hour = selectedTime ? selectedTime.hour() : 0;
+        let minute = selectedTime ? selectedTime.minute() : 0;
         cron_schedule = generateCronFromSelect(
-          selectedHour,
-          selectedMinute,
+          hour,
+          minute,
           scheduleType,
           values.day_of_week,
           values.day_of_month
@@ -323,24 +322,14 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
               name="cron_schedule"
               rules={[{ required: true, message: 'Please select a cron schedule' }]}
             >
-              <div style={{ display: 'flex', gap: 8 }}>
-                <label>Hour:</label>
-                <select value={selectedHour} onChange={handleHourChange}>
-                  {[...Array(24).keys()].map((h) => (
-                    <option key={h} value={h}>
-                      {h.toString().padStart(2, '0')}
-                    </option>
-                  ))}
-                </select>
-                <label>Minute:</label>
-                <select value={selectedMinute} onChange={handleMinuteChange}>
-                  {[...Array(60).keys()].map((m) => (
-                    <option key={m} value={m}>
-                      {m.toString().padStart(2, '0')}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <TimePicker
+                format="HH:mm"
+                value={selectedTime}
+                onChange={handleTimeChange}
+                minuteStep={1}
+                placeholder="Select time"
+                style={{ width: 120 }}
+              />
             </Form.Item>
           )}
           {scheduleType === 'custom' && (

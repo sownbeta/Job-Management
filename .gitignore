@@ -23,5 +23,4 @@ dist-ssr
 *.sln
 *.sw?
 
-# Thêm dòng này để bỏ qua package-lock.json
 package-lock.json

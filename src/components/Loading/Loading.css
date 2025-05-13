@@ -4,11 +4,11 @@
     align-items: center;
     justify-content: center;
     height: 100vh;
-    background-color: #ffffff;
+    /* background-color: #ffffff; */
   }
   
   .spinner {
-    border: 6px solid #f3f3f3;
+    border: 6px solid #eae7e7;
     border-top: 6px solid #1890ff;
     border-radius: 50%;
     width: 50px;

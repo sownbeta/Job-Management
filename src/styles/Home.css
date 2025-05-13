@@ -135,9 +135,4 @@
     align-items: flex-start;
     gap: 10px;
   }
-
-  .button-group {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
 }

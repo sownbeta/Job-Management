@@ -12,9 +12,12 @@ import RoundedBlackButton from '../components/Button/Button';
 import { deleteJob, getJobs, toggleJob } from '../services/jobServices';
 import Loading from '../components/Loading/Loading';
 import HistoryBackupModal from '../components/Backup/HistoryBackupModal';
+import { Switch as AntdSwitch } from 'antd';
+import { useDispatch, useSelector } from 'react-redux';
+import { renderJSTTime } from '../utils/timeUtils';
 
 const JobManagementSystem = () => {
-  const [job, setJobs] = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -22,6 +25,15 @@ const JobManagementSystem = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isHistoryModalVisible, setIsHistoryModalVisible] = useState(false);
   const jobsPerPage = 7;
+
+  const language = useSelector((state) => state.language);
+  const dispatch = useDispatch();
+
+  const handleLanguageSwitch = (checked) => {
+    dispatch({ type: 'SET_LANGUAGE', payload: checked ? 'ja' : 'en' });
+  };
+
+  const t = (en, ja) => (language === 'ja' ? ja : en);
 
   const updatedJobs = async () => {
     try {
@@ -32,7 +44,7 @@ const JobManagementSystem = () => {
         return response;
       }
     } catch (error) {
-      message.error('Error loading to-do list.', error);
+      message.error(t('Error loading to-do list.', 'ジョブリストの読み込みエラー'));
       return [];
     } finally {
       setIsLoading(false);
@@ -43,55 +55,10 @@ const JobManagementSystem = () => {
     updatedJobs();
   }, [refreshTrigger]);
 
-  const renderJSTTime = (cronSchedule) => {
-    if (!cronSchedule) return 'N/A';
-    try {
-      const [minute, hour] = cronSchedule.split(' ').map(Number);
-      if (cronSchedule === '* * * * *') return '毎分 ( Every minute )';
-      // Kiểm tra giá trị hợp lệ
-      if (isNaN(minute) || isNaN(hour) || minute < 0 || minute > 59 || hour < 0 || hour > 23) {
-        return 'Invalid Time';
-      }
-
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth();
-      const day = now.getDate();
-
-      const vietnamDate = new Date(year, month, day, hour, minute, 0, 0);
-      if (isNaN(vietnamDate.getTime())) {
-        return 'Invalid Time';
-      }
-
-      const jstDate = new Date(vietnamDate.getTime() + 2 * 60 * 60 * 1000);
-
-      const jstYear = jstDate.getFullYear();
-      const jstMonth = jstDate.getMonth() + 1;
-      const jstDay = jstDate.getDate();
-
-      const formattedTime = !isNaN(jstDate.getTime())
-        ? jstDate.toLocaleString('ja-JP', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          })
-        : 'Invalid Time';
-
-      if (isNaN(jstYear) || isNaN(jstMonth) || isNaN(jstDay) || formattedTime === 'Invalid Time') {
-        return 'Invalid Time';
-      }
-
-      return `${jstYear}年${jstMonth}月${jstDay}日 ${formattedTime} JST`;
-    } catch (error) {
-      console.error('Error parsing cronSchedule:', error);
-      return 'Invalid Time';
-    }
-  };
-
   const getDropdownItems = (record) => [
     {
       key: 'edit',
-      label: 'Edit Job',
+      label: t('Edit Job', '編集'),
       onClick: () => setEditJobData(record),
     },
     {
@@ -99,24 +66,28 @@ const JobManagementSystem = () => {
     },
     {
       key: 'delete',
-      label: 'Delete Job',
+      label: t('Delete Job', '消去'),
       onClick: () => handleDelete(record.id),
     },
   ];
 
   const handleDelete = (id) => {
     Modal.confirm({
-      title: `Are you sure you want to delete job ${id}?`,
-      content: 'This action cannot be undone.',
-      okText: 'Delete',
+      title: t(
+        `Are you sure you want to delete job ${id}?`,
+        `ジョブ ${id} を削除してもよろしいですか？`
+      ),
+      content: t('This action cannot be undone.', 'この操作は元に戻せません。'),
+      okText: t('Delete', '削除'),
+      cancelText: t('Cancel', 'キャンセル'),
       async onOk() {
         try {
           setIsLoading(true);
           await deleteJob(id);
           setRefreshTrigger((prev) => prev + 1);
-          message.success('Job deleted successfully!');
+          message.success(t('Job deleted successfully!', 'ジョブが正常に削除されました！'));
         } catch (error) {
-          message.error('Error deleting job.', error);
+          message.error(t('Error deleting job.', 'ジョブの削除エラー'));
         } finally {
           setIsLoading(false);
         }
@@ -129,10 +100,12 @@ const JobManagementSystem = () => {
       setIsLoading(true);
       await toggleJob(id);
       setRefreshTrigger((prev) => prev + 1);
-      message.success('Job status updated successfully!');
+      message.success(
+        t('Job status updated successfully!', 'ジョブのステータスが更新されました！')
+      );
     } catch (error) {
       console.error('Error updating job status:', error);
-      message.error('Error updating job status.', error);
+      message.error(t('Error updating job status.', 'ジョブのステータス更新エラー'));
     } finally {
       setIsLoading(false);
     }
@@ -147,7 +120,7 @@ const JobManagementSystem = () => {
     setIsHistoryModalVisible(true);
   };
 
-  const jobArray = useMemo(() => Object.values(job), [job]);
+  const jobArray = useMemo(() => Object.values(jobs), [jobs]);
 
   const filteredJobs = useMemo(() => {
     return jobArray.filter((job) => job.name?.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -165,7 +138,7 @@ const JobManagementSystem = () => {
       const now = new Date();
       const nowVN = new Date(now.getTime() + 7 * 60 * 60 * 1000);
 
-      job.forEach((jobItem) => {
+      jobs.forEach((jobItem) => {
         const [minute, hour] = jobItem.cron_schedule.split(' ').map(Number);
         if (nowVN.getUTCHours() === hour && nowVN.getUTCMinutes() === minute) {
           // Cập nhật trạng thái hoặc gọi API nếu cần
@@ -175,49 +148,33 @@ const JobManagementSystem = () => {
     }, 60000);
 
     return () => clearInterval(interval);
-  }, [job]);
+  }, [jobs]);
 
   const columns = [
     {
-      title: '#',
+      title: t('#', '番号'),
       key: 'id',
       dataIndex: 'id',
     },
     {
-      title: 'Name',
+      title: t('Name', '名前'),
       dataIndex: 'name',
       key: 'name',
     },
     {
-      title: 'Status',
+      title: t('Status', 'ステータス'),
       dataIndex: 'status',
       key: 'status',
       render: (status) => <span className={`status ${status?.toLowerCase()}`}>{status}</span>,
     },
     {
-      title: 'Last Run Time',
-      dataIndex: 'last_run_time',
-      key: 'last_run_time',
-      render: (value) =>
-        value
-          ? new Date(value).toLocaleString('ja-JP', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: false,
-            })
-          : 'N/A',
-    },
-    {
-      title: 'Time (JST)',
+      title: t('Time (JST)', '実行時刻 (JST)'),
       dataIndex: 'cron_schedule',
       key: 'time',
       render: (cronSchedule) => renderJSTTime(cronSchedule),
     },
     {
-      title: 'Action',
+      title: t('Action', '操作'),
       key: 'action',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -225,7 +182,7 @@ const JobManagementSystem = () => {
           <Dropdown menu={{ items: getDropdownItems(record) }}>
             <a onClick={(e) => e.preventDefault()}>
               <Space>
-                More
+                {t('More', '詳細')}
                 <DownOutlined />
               </Space>
             </a>
@@ -236,12 +193,29 @@ const JobManagementSystem = () => {
   ];
 
   return isLoading ? (
-    <Loading />
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+      }}
+    >
+      <Loading />
+    </div>
   ) : (
     <div className="container">
       <div className="header">
-        Job Management System
+        {t('Job Management System', 'ジョブ管理システム')}
         <div className="button-group">
+          <AntdSwitch
+            checkedChildren="日本語"
+            unCheckedChildren="English"
+            checked={language === 'ja'}
+            onChange={handleLanguageSwitch}
+            style={{ marginRight: 16, marginTop: '5px' }}
+          />
           <AddNewModal
             setIsLoading={setIsLoading}
             refreshJobs={() => setRefreshTrigger((prev) => prev + 1)}
@@ -249,14 +223,8 @@ const JobManagementSystem = () => {
             onClose={() => setEditJobData(null)}
             onJobUpdated={handleJobUpdated}
           />
-          <RoundedBlackButton onClick={() => console.log('Backup')}>
-            <FileTextOutlined /> Backup
-          </RoundedBlackButton>
-          <RoundedBlackButton onClick={() => console.log('Export')}>
-            <DownloadOutlined /> Export
-          </RoundedBlackButton>
           <button className="history-button" onClick={handleHistoryButtonClick}>
-            <FileTextOutlined /> History Backup
+            <FileTextOutlined /> {t('Jobs History', 'バックアップ履歴')}
           </button>
         </div>
       </div>
@@ -264,7 +232,7 @@ const JobManagementSystem = () => {
       <div className="table-container">
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
           <Input
-            placeholder="Search jobs"
+            placeholder={t('Search jobs', 'ジョブ検索')}
             prefix={<FileSearchOutlined />}
             style={{ width: 300 }}
             value={searchTerm}
@@ -284,7 +252,7 @@ const JobManagementSystem = () => {
 
         <div className="pagination">
           <div>
-            Total Job: <span className="total-job">{totalJobs}</span>
+            {t('Total Job:', 'ジョブ合計:')} <span className="total-job">{totalJobs}</span>
           </div>
           <Pagination
             current={currentPage}

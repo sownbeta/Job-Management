@@ -1,36 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Table, message } from 'antd';
+import { useSelector } from 'react-redux';
 import { getJobs } from '../../services/jobServices';
+import { renderJSTTime } from '../../utils/timeUtils';
 
 const HistoryBackupModal = ({ visible, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [historyData, setHistoryData] = useState([]);
+  const language = useSelector((state) => state.language);
+  const t = (en, ja) => (language === 'ja' ? ja : en);
 
-  const renderJSTTime = (cronSchedule) => {
-    if (!cronSchedule) return 'N/A';
-    try {
-      const [minute, hour] = cronSchedule.split(' ');
-      const date = new Date();
-      date.setUTCHours(parseInt(hour), parseInt(minute), 0, 0);
-      const jstDate = new Date(date.getTime() + 9 * 60 * 60 * 1000); 
-
-      const year = jstDate.getFullYear();
-      const month = jstDate.getMonth() + 1;
-      const day = jstDate.getDate();
-
-      const formattedTime = jstDate.toLocaleString('ja-JP', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
-
-      return `${year}年${month}月${day}日 ${formattedTime} JST`;
-    } catch {
-      return 'Invalid Time';
-    }
-  };
-
-  // Hàm convert cron thành mô tả lịch chạy
   const cronToScheduleText = (cron) => {
     if (!cron) return 'N/A';
     const parts = cron.split(' ');
@@ -55,10 +34,10 @@ const HistoryBackupModal = ({ visible, onClose }) => {
   const fetchHistoryData = async () => {
     try {
       setIsLoading(true);
-      const response = await getJobs(); 
+      const response = await getJobs();
       setHistoryData(response || []);
     } catch (error) {
-      message.error('Error fetching history data.', error);
+      message.error(t('Error fetching history data.', '履歴データの取得エラー'));
     } finally {
       setIsLoading(false);
     }
@@ -72,38 +51,38 @@ const HistoryBackupModal = ({ visible, onClose }) => {
 
   const historyColumns = [
     {
-      title: 'ID',
+      title: t('ID', 'ID'),
       dataIndex: 'id',
       key: 'id',
     },
     {
-      title: 'Name',
+      title: t('Name', '名前'),
       dataIndex: 'name',
       key: 'name',
     },
     {
-      title: 'Last Time Run',
+      title: t('Last Time Run', '前回実行時刻'),
       dataIndex: 'cron_schedule',
       key: 'time',
       render: (cronSchedule) => renderJSTTime(cronSchedule),
     },
     {
-      title: 'Status',
+      title: t('Status', 'ステータス'),
       dataIndex: 'status',
       key: 'status',
     },
     {
-      title: 'Folder Created',
+      title: t('Folder Created', '作成フォルダ'),
       dataIndex: 'destination_folder',
       key: 'folder_created',
     },
     {
-      title: 'Last Run Time',
+      title: t('Last Run Time', '最終実行時刻'),
       dataIndex: 'last_run_time',
       key: 'last_run_time',
       render: (value) =>
         value
-          ? new Date(value).toLocaleString('ja-JP', {
+          ? new Date(value).toLocaleString(language === 'ja' ? 'ja-JP' : 'en-US', {
               year: 'numeric',
               month: '2-digit',
               day: '2-digit',
@@ -114,14 +93,20 @@ const HistoryBackupModal = ({ visible, onClose }) => {
           : 'N/A',
     },
     {
-      title: 'Next Time Run',
+      title: t('Next Time Run', '次回実行予定'),
       key: 'next_time_run',
       render: (_, record) => cronToScheduleText(record.cron_schedule),
     },
   ];
 
   return (
-    <Modal title="History Backup" open={visible} onCancel={onClose} footer={null} width={'90vw'}>
+    <Modal
+      title={t('History Backup', 'バックアップ履歴')}
+      open={visible}
+      onCancel={onClose}
+      footer={null}
+      width={'90vw'}
+    >
       <Table
         columns={historyColumns}
         dataSource={historyData}

@@ -1,16 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Button,
-  DatePicker,
-  TimePicker,
-  Form,
-  Input,
-  message,
-  Modal,
-  Upload,
-  Radio,
-  Select,
-} from 'antd';
+import { Button, TimePicker, Form, Input, message, Modal, Upload, Radio, Select } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { uploadFile, updateJob } from '../../services/jobServices';
 import moment from 'moment';
@@ -18,6 +7,7 @@ import 'moment-timezone';
 import cronstrue from 'cronstrue';
 import './AddNew.css';
 import RoundedBlackButton from '../Button/Button';
+import { useSelector } from 'react-redux';
 
 const { Option } = Select;
 
@@ -29,6 +19,8 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
   const [scheduleType, setScheduleType] = useState('daily');
   const [cronPreview, setCronPreview] = useState('');
   const [selectedTime, setSelectedTime] = useState(null);
+  const language = useSelector((state) => state.language);
+  const t = (en, ja) => (language === 'ja' ? ja : en);
 
   useEffect(() => {
     if (editingJob) {
@@ -51,7 +43,7 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
 
   const handleFileChange = (file) => {
     if (file.type !== 'text/csv') {
-      message.error('Only CSV files are allowed.');
+      message.error(t('Only CSV files are allowed.', 'CSVファイルのみ許可されています。'));
       return false;
     }
     setUploadedFile(file);
@@ -193,7 +185,6 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
       }
 
       if (editingJob) {
-        // Update existing job
         const updates = {
           name: values.name,
           cron_schedule,
@@ -203,11 +194,10 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
           day_of_month: values.day_of_month,
         };
         await updateJob(editingJob.id, updates);
-        message.success('Job updated successfully!');
+        message.success(t('Job updated successfully!', 'ジョブが正常に更新されました！'));
       } else {
-        // Create new job
         if (!uploadedFile) {
-          message.error('Please select a CSV file.');
+          message.error(t('Please select a CSV file.', 'CSVファイルを選択してください。'));
           return;
         }
         const formData = new FormData();
@@ -218,15 +208,22 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
         formData.append('destination_folder', values.destination_folder || '');
         if (values.day_of_week) formData.append('day_of_week', values.day_of_week);
         if (values.day_of_month) formData.append('day_of_month', values.day_of_month);
-        formData.append('is_active', 'true'); // Thêm dòng này để job tự động chạy sau khi tạo
+        formData.append('is_active', 'true');
         await uploadFile(formData);
-        message.success('Job created and file uploaded successfully!');
+        message.success(
+          t(
+            'Job created and file uploaded successfully!',
+            'ジョブが作成され、ファイルが正常にアップロードされました！'
+          )
+        );
       }
-      handleCancel(); // Ensure modal is closed after submission
+      handleCancel();
       if (refreshJobs) refreshJobs();
     } catch (error) {
       console.error('Error:', error);
-      message.error('Operation failed. Please try again.');
+      message.error(
+        t('Operation failed. Please try again.', '操作に失敗しました。もう一度お試しください。')
+      );
     } finally {
       setIsLoading(false);
     }
@@ -245,11 +242,11 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
     <>
       {!editingJob && (
         <RoundedBlackButton type="primary" onClick={() => setIsModalOpen(true)}>
-          Add New +
+          {t('Add New +', '新規追加 +')}
         </RoundedBlackButton>
       )}
       <Modal
-        title={editingJob ? 'Edit Job' : 'Add New Job'}
+        title={editingJob ? t('Edit Job', 'ジョブ編集') : t('Add New Job', '新規ジョブ追加')}
         open={isModalOpen}
         onCancel={handleCancel}
         footer={null}
@@ -265,49 +262,69 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
           }}
         >
           <Form.Item
-            label="Job Name"
+            label={t('Job Name', 'ジョブ名')}
             name="name"
-            rules={[{ required: true, message: 'Please enter the job name' }]}
+            rules={[
+              {
+                required: true,
+                message: t('Please enter the job name', 'ジョブ名を入力してください'),
+              },
+            ]}
           >
-            <Input placeholder="Enter job name" />
+            <Input placeholder={t('Enter job name', 'ジョブ名を入力')} />
           </Form.Item>
           <Form.Item
-            label="Schedule Type"
+            label={t('Schedule Type', 'スケジュールタイプ')}
             name="schedule_type"
-            rules={[{ required: true, message: 'Please select a schedule type' }]}
+            rules={[
+              {
+                required: true,
+                message: t('Please select a schedule type', 'スケジュールタイプを選択してください'),
+              },
+            ]}
           >
             <Radio.Group onChange={handleScheduleTypeChange}>
-              <Radio value="run_once">Run Once</Radio>
-              <Radio value="daily">Daily</Radio>
-              <Radio value="weekly">Weekly</Radio>
-              <Radio value="monthly">Monthly</Radio>
-              <Radio value="custom">Custom</Radio>
+              <Radio value="run_once">{t('Run Once', '一度だけ実行')}</Radio>
+              <Radio value="daily">{t('Daily', '毎日')}</Radio>
+              <Radio value="weekly">{t('Weekly', '毎週')}</Radio>
+              <Radio value="monthly">{t('Monthly', '毎月')}</Radio>
+              <Radio value="custom">{t('Custom', 'カスタム')}</Radio>
             </Radio.Group>
           </Form.Item>
           {scheduleType === 'weekly' && (
             <Form.Item
-              label="Day of Week"
+              label={t('Day of Week', '曜日')}
               name="day_of_week"
-              rules={[{ required: true, message: 'Please select a day of the week' }]}
+              rules={[
+                {
+                  required: true,
+                  message: t('Please select a day of the week', '曜日を選択してください'),
+                },
+              ]}
             >
-              <Select placeholder="Select day of week">
-                <Option value="0">Sunday</Option>
-                <Option value="1">Monday</Option>
-                <Option value="2">Tuesday</Option>
-                <Option value="3">Wednesday</Option>
-                <Option value="4">Thursday</Option>
-                <Option value="5">Friday</Option>
-                <Option value="6">Saturday</Option>
+              <Select placeholder={t('Select day of week', '曜日を選択')}>
+                <Option value="0">{t('Sunday', '日曜日')}</Option>
+                <Option value="1">{t('Monday', '月曜日')}</Option>
+                <Option value="2">{t('Tuesday', '火曜日')}</Option>
+                <Option value="3">{t('Wednesday', '水曜日')}</Option>
+                <Option value="4">{t('Thursday', '木曜日')}</Option>
+                <Option value="5">{t('Friday', '金曜日')}</Option>
+                <Option value="6">{t('Saturday', '土曜日')}</Option>
               </Select>
             </Form.Item>
           )}
           {scheduleType === 'monthly' && (
             <Form.Item
-              label="Day of Month"
+              label={t('Day of Month', '日付')}
               name="day_of_month"
-              rules={[{ required: true, message: 'Please select a day of the month' }]}
+              rules={[
+                {
+                  required: true,
+                  message: t('Please select a day of the month', '日付を選択してください'),
+                },
+              ]}
             >
-              <Select placeholder="Select day of month">
+              <Select placeholder={t('Select day of month', '日付を選択')}>
                 {Array.from({ length: 31 }, (_, i) => (
                   <Option key={i + 1} value={String(i + 1)}>
                     {i + 1}
@@ -318,34 +335,47 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
           )}
           {scheduleType !== 'custom' && (
             <Form.Item
-              label="Cron Schedule"
+              label={t('Cron Schedule', 'Cronスケジュール')}
               name="cron_schedule"
-              rules={[{ required: true, message: 'Please select a cron schedule' }]}
+              rules={[
+                {
+                  required: true,
+                  message: t('Please select a cron schedule', 'Cronスケジュールを選択してください'),
+                },
+              ]}
             >
               <TimePicker
                 format="HH:mm"
                 value={selectedTime}
                 onChange={handleTimeChange}
                 minuteStep={1}
-                placeholder="Select time"
+                placeholder={t('Select time', '時間を選択')}
                 style={{ width: 120 }}
               />
             </Form.Item>
           )}
           {scheduleType === 'custom' && (
             <Form.Item
-              label="Custom Cron Expression"
+              label={t('Custom Cron Expression', 'カスタムCron式')}
               name="custom_cron"
-              rules={[{ required: true, message: 'Please enter a cron expression' }]}
+              rules={[
+                {
+                  required: true,
+                  message: t('Please enter a cron expression', 'Cron式を入力してください'),
+                },
+              ]}
             >
               <Input
-                placeholder="Enter cron expression (e.g., 0 0 12 * * ?)"
+                placeholder={t(
+                  'Enter cron expression (e.g., 0 0 12 * * ?)',
+                  'Cron式を入力（例: 0 0 12 * * ?）'
+                )}
                 onChange={handleCustomCronChange}
               />
             </Form.Item>
           )}
           {cronPreview && (
-            <Form.Item label="Schedule Preview">
+            <Form.Item label={t('Schedule Preview', 'スケジュールプレビュー')}>
               <p style={{ color: cronPreview.includes('Invalid') ? 'red' : 'green' }}>
                 {cronPreview}
               </p>
@@ -353,20 +383,29 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
           )}
           {!editingJob && (
             <Form.Item
-              label="Source File"
+              label={t('Source File', 'ソースファイル')}
               name="source_file"
-              rules={[{ required: true, message: 'Please select a source file' }]}
+              rules={[
+                {
+                  required: true,
+                  message: t('Please select a source file', 'ソースファイルを選択してください'),
+                },
+              ]}
             >
               <Upload beforeUpload={handleFileChange} showUploadList={false}>
-                <Button icon={<UploadOutlined />}>Select File</Button>
+                <Button icon={<UploadOutlined />}>{t('Select File', 'ファイルを選択')}</Button>
               </Upload>
-              {uploadedFile && <p>Selected File: {uploadedFile.name}</p>}
+              {uploadedFile && (
+                <p>
+                  {t('Selected File:', '選択されたファイル:')} {uploadedFile.name}
+                </p>
+              )}
             </Form.Item>
           )}
           <Form.Item>
-            <Button onClick={handleCancel}>Cancel</Button>
+            <Button onClick={handleCancel}>{t('Cancel', 'キャンセル')}</Button>
             <Button type="primary" htmlType="submit" loading={isLoading} style={{ marginLeft: 8 }}>
-              {editingJob ? 'Update Job' : 'Create'}
+              {editingJob ? t('Update Job', 'ジョブを更新') : t('Create', '作成')}
             </Button>
           </Form.Item>
         </Form>

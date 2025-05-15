@@ -136,3 +136,59 @@
     gap: 10px;
   }
 }
+
+/* Container for the custom table in modal */
+.custom-table-container {
+  width: 100%;
+  overflow-x: auto;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  padding: 12px 0;
+}
+
+/* Table style */
+.custom-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+  background: #fff;
+}
+
+.custom-table th, .custom-table td {
+  border: 1px solid #e8e8e8;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.custom-table th {
+  background: #fafafa;
+  font-weight: 600;
+  color: #222;
+}
+
+.custom-table tbody tr:nth-child(even) {
+  background: #f7f7f7;
+}
+
+.custom-table tbody tr:hover {
+  background: #e6f7ff;
+  transition: background 0.2s;
+}
+
+.custom-table td {
+  vertical-align: middle;
+}
+
+.custom-table .ant-btn {
+  padding: 0 8px;
+  height: 28px;
+  font-size: 13px;
+}
+
+@media (max-width: 700px) {
+  .custom-table th, .custom-table td {
+    padding: 7px 4px;
+    font-size: 13px;
+  }
+}

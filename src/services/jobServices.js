@@ -23,3 +23,7 @@ export const toggleJob = (id) => handleRequest(post, `/toggle-job/${id}`);
 
 export const uploadFile = (formData) =>
   handleRequest(post, '/upload-file', formData, { 'Content-Type': 'multipart/form-data' });
+
+export const getJobDelete = () => handleRequest(get, `/jobs/deleted`);
+export const restoreJob = (id) => handleRequest(post, `/jobs/${id}/restore`);
+export const deleteJobForever = (id)=>handleRequest(post,`/jobs/${id}/forever`)

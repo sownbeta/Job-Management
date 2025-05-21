@@ -22,13 +22,16 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
   const language = useSelector((state) => state.language);
   const t = (en, ja) => (language === 'ja' ? ja : en);
 
+  // Đồng bộ selectedTime với cron_schedule khi mở modal hoặc khi editingJob thay đổi
   useEffect(() => {
     if (editingJob) {
       setIsModalOpen(true);
       const scheduleType = editingJob.cron_schedule?.includes('?') ? 'custom' : 'daily';
       form.setFieldsValue({
         name: editingJob.name,
-        cron_schedule: editingJob.cron_schedule ? moment(editingJob.cron_schedule) : moment(),
+        cron_schedule: editingJob.cron_schedule
+          ? moment(editingJob.cron_schedule, 'HH:mm')
+          : moment(),
         source_folder: editingJob.source_folder,
         destination_folder: editingJob.destination_folder,
         schedule_type: scheduleType,
@@ -38,24 +41,31 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
       });
       setScheduleType(scheduleType);
       updateCronPreview(editingJob.cron_schedule || '');
+
+      // Parse cron_schedule để lấy giờ và phút nếu không phải custom
+      if (editingJob.cron_schedule && scheduleType !== 'custom') {
+        const cronParts = editingJob.cron_schedule.split(' ');
+        if (cronParts.length >= 2) {
+          const minute = parseInt(cronParts[0], 10);
+          const hour = parseInt(cronParts[1], 10);
+          setSelectedTime(moment({ hour, minute }));
+        }
+      } else {
+        setSelectedTime(null);
+      }
+    } else {
+      setSelectedTime(null);
     }
   }, [editingJob, form]);
 
-  const handleFileChange = (file) => {
-    if (file.type !== 'text/csv') {
-      message.error(t('Only CSV files are allowed.', 'CSVファイルのみ許可されています。'));
-      return false;
-    }
-    setUploadedFile(file);
-    return false;
-  };
-
+  // Khi đổi schedule type, đồng bộ lại selectedTime nếu có
   const handleScheduleTypeChange = (e) => {
     const value = e.target.value;
     setScheduleType(value);
     if (value !== 'custom') {
       const cron_schedule = form.getFieldValue('cron_schedule');
       if (cron_schedule) {
+        setSelectedTime(cron_schedule);
         const cron = generateCron(
           cron_schedule,
           value,
@@ -65,6 +75,15 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
         updateCronPreview(cron);
       }
     }
+  };
+
+  const handleFileChange = (file) => {
+    if (file.type !== 'text/csv') {
+      message.error(t('Only CSV files are allowed.', 'CSVファイルのみ許可されています。'));
+      return false;
+    }
+    setUploadedFile(file);
+    return false;
   };
 
   const updateCronPreview = (cron) => {
@@ -147,20 +166,6 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
     }
   };
 
-  const handleCronScheduleChange = (date) => {
-    console.log('Selected date:', date);
-
-    if (date && scheduleType !== 'custom') {
-      const cron = generateCron(
-        date,
-        scheduleType,
-        form.getFieldValue('day_of_week'),
-        form.getFieldValue('day_of_month')
-      );
-      updateCronPreview(cron);
-    }
-  };
-
   const handleCustomCronChange = (e) => {
     const cron = e.target.value;
     updateCronPreview(cron);
@@ -173,8 +178,18 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
       if (scheduleType === 'custom') {
         cron_schedule = values.custom_cron;
       } else {
-        let hour = selectedTime ? selectedTime.hour() : 0;
-        let minute = selectedTime ? selectedTime.minute() : 0;
+        // Nếu selectedTime không có, lấy từ values.cron_schedule (trường hợp submit mà chưa chọn lại giờ)
+        let hour, minute;
+        if (selectedTime) {
+          hour = selectedTime.hour();
+          minute = selectedTime.minute();
+        } else if (values.cron_schedule) {
+          hour = values.cron_schedule.hour();
+          minute = values.cron_schedule.minute();
+        } else {
+          hour = 0;
+          minute = 0;
+        }
         cron_schedule = generateCronFromSelect(
           hour,
           minute,
@@ -193,29 +208,23 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
           day_of_week: values.day_of_week,
           day_of_month: values.day_of_month,
         };
+
         await updateJob(editingJob.id, updates);
         message.success(t('Job updated successfully!', 'ジョブが正常に更新されました！'));
       } else {
-        if (!uploadedFile) {
-          message.error(t('Please select a CSV file.', 'CSVファイルを選択してください。'));
-          return;
-        }
-        const formData = new FormData();
-        formData.append('job_name', values.name);
-        formData.append('cron_schedule', cron_schedule);
-        formData.append('file', uploadedFile);
-        formData.append('source_folder', values.source_folder || '');
-        formData.append('destination_folder', values.destination_folder || '');
-        if (values.day_of_week) formData.append('day_of_week', values.day_of_week);
-        if (values.day_of_month) formData.append('day_of_month', values.day_of_month);
-        formData.append('is_active', 'true');
-        await uploadFile(formData);
-        message.success(
-          t(
-            'Job created and file uploaded successfully!',
-            'ジョブが作成され、ファイルが正常にアップロードされました！'
-          )
-        );
+        const data = {
+          job_name: values.name,
+          cron_schedule,
+          input_path: values.source_folder,
+          output_path: values.destination_folder,
+          output_file_name: values.output_file_name,
+        };
+        if (values.day_of_week) data.day_of_week = values.day_of_week;
+        if (values.day_of_month) data.day_of_month = values.day_of_month;
+        data.is_active = true;
+
+        await uploadFile(data);
+        message.success(t('Job created successfully!', 'ジョブが正常に作成されました！'));
       }
       handleCancel();
       if (refreshJobs) refreshJobs();
@@ -235,6 +244,7 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
     setUploadedFile(null);
     setScheduleType('daily');
     setCronPreview('');
+    setSelectedTime(null);
     if (onClose) onClose();
   };
 
@@ -382,6 +392,73 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
             </Form.Item>
           )}
           {!editingJob && (
+            <>
+              <Form.Item
+                label={t('Input Folder Path', '入力フォルダパス')}
+                name="source_folder"
+                rules={[
+                  {
+                    required: true,
+                    message: t(
+                      'Please enter the input folder path',
+                      '入力フォルダパスを入力してください'
+                    ),
+                  },
+                ]}
+              >
+                <Input
+                  placeholder={t(
+                    'Enter input folder path (e.g. D:\\data1\\input)',
+                    '入力フォルダパスを入力（例: D:\\data1\\input）'
+                  )}
+                  allowClear
+                />
+              </Form.Item>
+              <Form.Item
+                label={t('Output Folder Path', '出力フォルダパス')}
+                name="destination_folder"
+                rules={[
+                  {
+                    required: true,
+                    message: t(
+                      'Please enter the output folder path',
+                      '出力フォルダパスを入力してください'
+                    ),
+                  },
+                ]}
+              >
+                <Input
+                  placeholder={t(
+                    'Enter output folder path (e.g. D:\\data1\\output)',
+                    '出力フォルダパスを入力（例: D:\\data1\\output）'
+                  )}
+                  allowClear
+                />
+              </Form.Item>
+              <Form.Item
+                label={t('Output File Name', '出力ファイル名')}
+                name="output_file_name"
+                rules={[
+                  {
+                    required: true,
+                    message: t(
+                      'Please enter the output file name',
+                      '出力ファイル名を入力してください'
+                    ),
+                  },
+                ]}
+              >
+                <Input
+                  placeholder={t(
+                    'Enter output file name (e.g. example.csv)',
+                    '出力ファイル名を入力（例: example.csv）'
+                  )}
+                  allowClear
+                />
+              </Form.Item>
+            </>
+          )}
+          {/* {!editingJob && (
             <Form.Item
               label={t('Source File', 'ソースファイル')}
               name="source_file"
@@ -401,7 +478,7 @@ const AddNewModal = ({ editingJob, onClose, refreshJobs }) => {
                 </p>
               )}
             </Form.Item>
-          )}
+          )} */}
           <Form.Item>
             <Button onClick={handleCancel}>{t('Cancel', 'キャンセル')}</Button>
             <Button type="primary" htmlType="submit" loading={isLoading} style={{ marginLeft: 8 }}>

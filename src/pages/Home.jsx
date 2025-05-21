@@ -1,15 +1,22 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import '../styles/Home.css';
-import { Table, Button, Switch, Input, Pagination, message, Dropdown, Space, Modal, Menu } from 'antd';
+import { DownOutlined, FileSearchOutlined, FileTextOutlined } from '@ant-design/icons';
 import {
-  FileTextOutlined,
-  DownloadOutlined,
-  FileSearchOutlined,
-  DownOutlined,
-  EllipsisOutlined,
-} from '@ant-design/icons';
+  Switch as AntdSwitch,
+  Button,
+  Dropdown,
+  Input,
+  Modal,
+  Pagination,
+  Space,
+  Switch,
+  Table,
+  message,
+} from 'antd';
+import { useEffect, useMemo, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import AddNewModal from '../components/AddNew/AddNew';
+import HistoryBackupModal from '../components/Backup/HistoryBackupModal';
 import RoundedBlackButton from '../components/Button/Button';
+import Loading from '../components/Loading/Loading';
 import {
   deleteJob,
   deleteJobForever,
@@ -18,11 +25,7 @@ import {
   restoreJob,
   toggleJob,
 } from '../services/jobServices';
-import Loading from '../components/Loading/Loading';
-import HistoryBackupModal from '../components/Backup/HistoryBackupModal';
-import { Switch as AntdSwitch } from 'antd';
-import { useDispatch, useSelector } from 'react-redux';
-import { renderJSTTime } from '../utils/timeUtils';
+import '../styles/Home.css';
 
 const JobManagementSystem = () => {
   const [jobs, setJobs] = useState([]);
@@ -35,6 +38,8 @@ const JobManagementSystem = () => {
   const jobsPerPage = 7;
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const [jobDelete, setJobDelete] = useState([]);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [isJobDetailModalOpen, setIsJobDetailModalOpen] = useState(false);
   const language = useSelector((state) => state.language);
   const dispatch = useDispatch();
 
@@ -67,18 +72,35 @@ const JobManagementSystem = () => {
   const getDropdownItems = (record) => [
     {
       key: 'edit',
-      label: t('Edit Job', '編集'),
-      onClick: () => setEditJobData(record),
+      label: (
+        <span
+          onClick={(e) => {
+            e.stopPropagation();
+            setEditJobData(record);
+          }}
+        >
+          {t('Edit Job', '編集')}
+        </span>
+      ),
     },
     {
       type: 'divider',
     },
     {
       key: 'delete',
-      label: t('Delete Job', '消去'),
-      onClick: () => handleDelete(record.id),
+      label: (
+        <span
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDelete(record.id);
+          }}
+        >
+          {t('Delete Job', '消去')}
+        </span>
+      ),
     },
   ];
+  console.log('2', selectedJob);
 
   const handleDelete = (id) => {
     Modal.confirm({
@@ -145,6 +167,18 @@ const JobManagementSystem = () => {
     setJobDelete([]);
   };
 
+  const handleRowClick = (record, event) => {
+    if (
+      event.target.closest('.ant-switch') ||
+      event.target.closest('.ant-dropdown-trigger') ||
+      event.target.closest('button')
+    ) {
+      return;
+    }
+    setSelectedJob(record);
+    setIsJobDetailModalOpen(true);
+  };
+
   const jobArray = useMemo(() => Object.values(jobs), [jobs]);
 
   const filteredJobs = useMemo(() => {
@@ -167,7 +201,6 @@ const JobManagementSystem = () => {
         const [minute, hour] = jobItem.cron_schedule.split(' ').map(Number);
         if (nowVN.getUTCHours() === hour && nowVN.getUTCMinutes() === minute) {
           // Cập nhật trạng thái hoặc gọi API nếu cần
-          // Ví dụ: setRefreshTrigger((prev) => prev + 1);
         }
       });
     }, 60000);
@@ -193,20 +226,35 @@ const JobManagementSystem = () => {
       render: (status) => <span className={`status ${status?.toLowerCase()}`}>{status}</span>,
     },
     {
-      title: t('Time (JST)', '実行時刻 (JST)'),
+      title: t('Schedule Job', '実行時刻 (JST)'),
       dataIndex: 'cron_schedule',
       key: 'time',
-      // render ra định dạng thời gian JST
-      render: (cronSchedule) => renderJSTTime(cronSchedule),
+    },
+    {
+      title: t('Last Time Run', 'ステータス'),
+      dataIndex: 'last_run_time',
+      key: 'last_run_time',
     },
     {
       title: t('Action', '操作'),
       key: 'action',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Switch checked={record?.is_active} onChange={() => toggleJobStatus(record?.id)} />
+          <Switch
+            checked={record?.is_active}
+            onChange={(checked, e) => {
+              if (e && e.stopPropagation) e.stopPropagation();
+              toggleJobStatus(record?.id);
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
           <Dropdown menu={{ items: getDropdownItems(record) }}>
-            <a onClick={(e) => e.preventDefault()}>
+            <a
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
               <Space>
                 {t('More', '詳細')}
                 <DownOutlined />
@@ -225,6 +273,7 @@ const JobManagementSystem = () => {
         message.success(
           language === 'en' ? 'Job restored successfully!' : 'ジョブが正常に復元されました!'
         );
+        setRefreshTrigger((prev) => prev + 1); // Refresh data
       }
     } catch (error) {
       console.error('Error:', error);
@@ -241,14 +290,16 @@ const JobManagementSystem = () => {
       async onOk() {
         setIsLoading(true);
         try {
-          const response = deleteJobForever(jobId);
+          const response = await deleteJobForever(jobId);
           if (response) {
             message.success('Job deleted successfully!');
+            setRefreshTrigger((prev) => prev + 1); // Refresh data
           }
         } catch (error) {
           console.error('Error deleting job:', error);
         } finally {
           setIsLoading(false);
+          closeBackupModal();
         }
       },
     });
@@ -313,6 +364,10 @@ const JobManagementSystem = () => {
             pagination={false}
             rowKey="id"
             scroll={{ y: 460 }}
+            onRow={(record) => ({
+              onClick: (event) => handleRowClick(record, event),
+              style: { cursor: 'pointer' },
+            })}
           />
         </div>
 
@@ -325,83 +380,96 @@ const JobManagementSystem = () => {
             pageSize={jobsPerPage}
             total={totalJobs}
             onChange={(page) => setCurrentPage(page)}
-            showSizeChanger={false}
+            style={{ marginTop: '16px', textAlign: 'right' }}
           />
         </div>
       </div>
 
       <HistoryBackupModal
         visible={isHistoryModalVisible}
-        onClose={() => setIsHistoryModalVisible(false)}
+        onCancel={() => setIsHistoryModalVisible(false)}
       />
 
       <Modal
-        title="Backup Job"
+        title={t('Deleted Jobs', '削除されたジョブ')}
         open={isBackupModalOpen}
         onCancel={closeBackupModal}
         footer={null}
-        width="80vw"
+        width={800} // Tăng kích thước modal bin
       >
-        <div className="custom-table-container">
-          <table className="custom-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>{language === 'en' ? 'Name' : '名前'}</th>
-                <th>{language === 'en' ? 'Cron Schedule' : 'スケジュール'}</th>
-                <th>{language === 'en' ? 'Last Run' : 'ラストラン'}</th>
-                <th>{language === 'en' ? 'Status' : '状態'}</th>
-                <th>{language === 'en' ? 'Action' : 'アクション'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobDelete?.length > 0 ? (
-                jobDelete.map((job) => (
-                  <tr key={job.id}>
-                    <td>{job.id}</td>
-                    <td>{job.name}</td>
-                    <td>{job.cron_schedule}</td>
-                    <td>{job.last_run_time}</td>
-                    <td>
-                      {job.status === 'Fail' && job.error_message ? (
-                        <span title={job.error_message} style={{ color: 'red' }}>
-                          {job.status}
-                        </span>
-                      ) : (
-                        job.status
-                      )}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <Dropdown
-                          overlay={
-                            <Menu>
-                              <Menu.Item key="restore" onClick={() => handleRestore(job?.id)}>
-                                {language === 'en' ? 'Restore' : '復元する'}
-                              </Menu.Item>
-                              <Menu.Item key="delete" onClick={() => handleDeleteForever(job?.id)}>
-                                {language === 'en' ? 'Delete' : '削除'}
-                              </Menu.Item>
-                            </Menu>
-                          }
-                          trigger={['click']}
-                        >
-                          <Button size="small" icon={<EllipsisOutlined />} />
-                        </Dropdown>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: 'center' }}>
-                    No jobs available.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table
+          dataSource={jobDelete}
+          columns={[
+            {
+              title: t('ID', 'ID'),
+              dataIndex: 'id',
+              key: 'id',
+            },
+            {
+              title: t('Name', '名前'),
+              dataIndex: 'name',
+              key: 'name',
+            },
+            {
+              title: t('Action', '操作'),
+              key: 'actions',
+              render: (_, record) => (
+                <Space>
+                  <Button type="primary" onClick={() => handleRestore(record.id)}>
+                    {t('Restore', '復元')}
+                  </Button>
+                  <Button danger onClick={() => handleDeleteForever(record.id)}>
+                    {t('Delete Forever', '完全に削除')}
+                  </Button>
+                </Space>
+              ),
+            },
+          ]}
+          rowKey="id"
+          scroll={{ y: 300 }}
+        />
+      </Modal>
+
+      <Modal
+        title={t('Job Details', 'ジョブ詳細')}
+        open={isJobDetailModalOpen}
+        onCancel={() => setIsJobDetailModalOpen(false)}
+        footer={null}
+        width={600} // Tăng kích thước modal
+      >
+        {selectedJob && (
+          <div>
+            <p>
+              <b>ID:</b> {selectedJob.id}
+            </p>
+            <p>
+              <b>{t('Name', '名前')}:</b> {selectedJob.name}
+            </p>
+            <p>
+              <b>{t('Status', 'ステータス')}:</b> {selectedJob.status}
+            </p>
+            <p>
+              <b>{t('Schedule Job', '実行時刻 (JST)')}:</b> {selectedJob.cron_schedule}
+            </p>
+            {/* Hiển thị stats nếu có */}
+            {selectedJob.stats && selectedJob.stats.details && (
+              <div style={{ marginTop: 24 }}>
+                <h3>{t('Job Stats', 'ジョブ統計')}</h3>
+                <ul style={{ fontSize: 16 }}>
+                  <li>
+                    <b>{t('Success', '成功')}:</b> {selectedJob.stats.success}
+                  </li>
+                  <li>
+                    <b>{t('Failed', '失敗')}:</b> {selectedJob.stats.failed}
+                  </li>
+                  <li>
+                    <b>{t('Total', '合計')}:</b> {selectedJob.stats.total}
+                  </li>
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   );

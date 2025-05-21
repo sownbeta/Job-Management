@@ -1,4 +1,4 @@
-import { get, post } from '../util/axiosConfig.js';
+import { get, post } from '../utils/axiosConfig.js';
 
 const handleRequest = async (method, url, data = null, headers = {}) => {
   try {
@@ -21,9 +21,8 @@ export const updateJob = (id, data) => handleRequest(post, `/edit-job/${id}`, da
 
 export const toggleJob = (id) => handleRequest(post, `/toggle-job/${id}`);
 
-export const uploadFile = (formData) =>
-  handleRequest(post, '/upload-file', formData, { 'Content-Type': 'multipart/form-data' });
+export const uploadFile = (data) => handleRequest(post, '/upload-file', data);
 
 export const getJobDelete = () => handleRequest(get, `/jobs/deleted`);
 export const restoreJob = (id) => handleRequest(post, `/jobs/${id}/restore`);
-export const deleteJobForever = (id)=>handleRequest(post,`/jobs/${id}/forever`)
+export const deleteJobForever = (id) => handleRequest(post, `/jobs/${id}/forever`);

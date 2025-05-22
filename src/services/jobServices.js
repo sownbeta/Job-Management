@@ -11,7 +11,13 @@ const handleRequest = async (method, url, data = null, headers = {}) => {
   }
 };
 
-export const getJobs = () => handleRequest(get, '/jobs');
+export const getJobs = () =>
+  handleRequest(get, '/jobs').then((response) =>
+    response.map((job) => ({
+      ...job,
+      stats: job.stats || { total: 0, success: 0, failed: 0 },
+    }))
+  );
 
 export const getJobById = (id) => handleRequest(get, `/job/${id}`);
 
@@ -24,5 +30,11 @@ export const toggleJob = (id) => handleRequest(post, `/toggle-job/${id}`);
 export const uploadFile = (data) => handleRequest(post, '/upload-file', data);
 
 export const getJobDelete = () => handleRequest(get, `/jobs/deleted`);
+
 export const restoreJob = (id) => handleRequest(post, `/jobs/${id}/restore`);
+
 export const deleteJobForever = (id) => handleRequest(post, `/jobs/${id}/forever`);
+
+export const fetchJobHistory = () => handleRequest(get, '/job-history');
+
+export const fetchJobLogs = (jobId) => handleRequest(get, `/job/${jobId}/logs`);

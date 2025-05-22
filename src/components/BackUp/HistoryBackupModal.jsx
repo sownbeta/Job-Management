@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Table, message } from 'antd';
+import { Modal, Table, Tooltip } from 'antd';
 import { useSelector } from 'react-redux';
-import { getJobs } from '../../services/jobServices';
-import { renderJSTTime } from '../../utils/timeUtils';
+import { fetchJobHistory } from '../../services/jobServices';
+import { formatToJST } from '../../utils/helper';
 
 const HistoryBackupModal = ({ visible, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -10,34 +10,13 @@ const HistoryBackupModal = ({ visible, onClose }) => {
   const language = useSelector((state) => state.language);
   const t = (en, ja) => (language === 'ja' ? ja : en);
 
-  const cronToScheduleText = (cron) => {
-    if (!cron) return 'N/A';
-    const parts = cron.split(' ');
-    if (parts.length < 5) return 'Invalid';
-    const [min, hour, dom, month, dow] = parts;
-
-    if (min === '*' && hour === '*' && dom === '*' && month === '*' && dow === '*') {
-      return 'Every minute';
-    }
-    if (dom === '*' && month === '*' && dow === '*') {
-      return `Every day at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
-    }
-    if (dom === '*' && month === '*' && dow !== '*') {
-      return `Every week on ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][parseInt(dow, 10)]} at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
-    }
-    if (dom !== '*' && month === '*' && dow === '*') {
-      return `Every month on day ${dom} at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
-    }
-    return cron;
-  };
-
   const fetchHistoryData = async () => {
     try {
       setIsLoading(true);
-      const response = await getJobs();
+      const response = await fetchJobHistory();
       setHistoryData(response || []);
     } catch (error) {
-      message.error(t('Error fetching history data.', '履歴データの取得エラー'));
+      console.log(error);
     } finally {
       setIsLoading(false);
     }
@@ -51,61 +30,59 @@ const HistoryBackupModal = ({ visible, onClose }) => {
 
   const historyColumns = [
     {
-      title: t('ID', 'ID'),
-      dataIndex: 'id',
-      key: 'id',
+      title: t('Job ID', 'ジョブID'),
+      dataIndex: 'job_id',
+      key: 'job_id',
+      width: 100,
     },
     {
       title: t('Name', '名前'),
-      dataIndex: 'name',
-      key: 'name',
+      dataIndex: ['job', 'name'],
+      key: 'job_name',
+      width: 150,
     },
     {
-      title: t('Last Time Run', '前回実行時刻'),
-      dataIndex: 'cron_schedule',
-      key: 'time',
-      render: (cronSchedule) => renderJSTTime(cronSchedule),
-    },
-    {
-      title: t('Status', 'ステータス'),
+      title: t('Status', '状態'),
       dataIndex: 'status',
       key: 'status',
+      width: 120,
+      render: (text, record) =>
+        record.error_message && text === 'Fail' ? (
+          <Tooltip title={record.error_message}>
+            <span style={{ color: 'red' }}>{text}</span>
+          </Tooltip>
+        ) : (
+          text
+        ),
     },
     {
-      title: t('Folder Created', '作成フォルダ'),
+      title: t('Source Folder', 'ソースフォルダ'),
+      dataIndex: 'source_folder',
+      key: 'source_folder',
+      width: 200,
+    },
+    {
+      title: t('Destination Folder', '出力フォルダ'),
       dataIndex: 'destination_folder',
-      key: 'folder_created',
+      key: 'destination_folder',
+      width: 200,
     },
     {
-      title: t('Last Run Time', '最終実行時刻'),
-      dataIndex: 'last_run_time',
-      key: 'last_run_time',
-      render: (value) =>
-        value
-          ? new Date(value).toLocaleString(language === 'ja' ? 'ja-JP' : 'en-US', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: false,
-            })
-          : 'N/A',
-    },
-    {
-      title: t('Next Time Run', '次回実行予定'),
-      key: 'next_time_run',
-      render: (_, record) => cronToScheduleText(record.cron_schedule),
+      title: t('Run Time', '実行時間'),
+      dataIndex: 'run_time',
+      key: 'run_time',
+      width: 200,
+      render: (text) => formatToJST(text),
     },
   ];
 
   return (
     <Modal
-      title={t('History Backup', 'バックアップ履歴')}
+      title={t('Job History', 'ジョブ履歴')}
       open={visible}
       onCancel={onClose}
       footer={null}
-      width={'90vw'}
+      width={'80vw'}
     >
       <Table
         columns={historyColumns}
